@@ -1,174 +1,142 @@
 """
-Script Python que substitui Google Apps Script
-Lê notas do Obsidian no Drive e mescla em arquivo TXT
+merge_notes.py — Mescla todas as notas .md do Obsidian em Obsidian_Master.txt
+Versão refatorada: usa DriveClient centralizado, paginação completa e logging.
+
+Este script substitui o Google Apps Script (Code.js).
+Execute via GitHub Actions ou localmente.
 """
 
 import os
-from google.oauth2 import credentials
-from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
-from googleapiclient.http import MediaIoBaseUpload
-import io
-from datetime import datetime
+import sys
+from datetime import datetime, timezone
+from drive_client import DriveClient
+from logger import log_pipeline_run
 
 
-def merge_obsidian_notes(folder_id, output_filename='Obsidian_Master.txt'):
+def merge_obsidian_notes(
+    folder_id: str,
+    output_filename: str = 'Obsidian_Master.txt',
+) -> bool:
     """
-    Mescla todas as notas .md do Obsidian em um único arquivo TXT
-    
+    Mescla todas as notas .md do Obsidian em um único arquivo TXT no Drive.
+
     Args:
-        folder_id: ID da pasta do Obsidian no Drive
-        output_filename: Nome do arquivo de saída
+        folder_id:       ID da pasta raiz do Obsidian no Drive.
+        output_filename: Nome do arquivo de saída.
+
+    Returns:
+        True em caso de sucesso, False em caso de erro.
     """
-    # Configurações OAuth
-    client_id = os.getenv('GOOGLE_CLIENT_ID')
-    client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
-    refresh_token = os.getenv('GOOGLE_REFRESH_TOKEN')
-    
-    if not all([client_id, client_secret, refresh_token]):
-        print("❌ Variáveis OAuth não configuradas")
-        return False
-    
+    log_pipeline_run("merge_notes", "started", {"folder_id": folder_id})
+
     try:
-        # Cria credenciais
-        creds = credentials.Credentials(
-            token=None,
-            refresh_token=refresh_token,
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=client_id,
-            client_secret=client_secret,
-            scopes=['https://www.googleapis.com/auth/drive']
-        )
-        
-        # Renova token
-        creds.refresh(Request())
-        
-        # Conecta ao Drive
-        drive_service = build('drive', 'v3', credentials=creds)
-        
-        print(f"📖 Lendo notas da pasta: {folder_id}")
-        
-        # Busca todos os arquivos .md recursivamente
+        drive = DriveClient()
         all_notes = []
-        
-        def list_files(folder_id, path=""):
-            query = f"'{folder_id}' in parents and name contains '.md'"
-            results = drive_service.files().list(
-                q=query,
-                pageSize=100,
-                fields="nextPageToken, files(id, name)"
-            ).execute()
-            
-            files = results.get('files', [])
-            
-            for file in files:
-                # Lê conteúdo do arquivo
-                request = drive_service.files().get_media(fileId=file['id'])
-                content = request.execute()
-                
-                if isinstance(content, bytes):
-                    content = content.decode('utf-8')
-                
-                all_notes.append({
-                    'name': file['name'],
-                    'path': path,
-                    'content': str(content)
-                })
-                print(f"   ✅ {file['name']}")
-            
-            # Busca subpastas
-            query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
-            results = drive_service.files().list(
-                q=query,
-                pageSize=100,
-                fields="nextPageToken, files(id, name)"
-            ).execute()
-            
-            folders = results.get('files', [])
-            
+
+        def collect_notes(fid: str, path: str = ""):
+            """Coleta notas .md recursivamente."""
+            # Arquivos .md na pasta atual
+            files = drive.list_files(fid, extension=".md")
+            for f in files:
+                try:
+                    content = drive.read_file(f['id'])
+                    all_notes.append({
+                        'name': f['name'],
+                        'path': path,
+                        'modified': f.get('modifiedTime', ''),
+                        'content': content,
+                    })
+                    print(f"   ✅ {path}{f['name']}")
+                except Exception as e:
+                    print(f"   ⚠️ Falha ao ler {f['name']}: {e}")
+
+            # Subpastas
+            folders = drive.list_folders(fid)
             for folder in folders:
-                list_files(folder['id'], f"{path}{folder['name']}/")
-        
-        list_files(folder_id)
-        
+                collect_notes(folder['id'], f"{path}{folder['name']}/")
+
+        print(f"📖 Coletando notas da pasta: {folder_id}")
+        collect_notes(folder_id)
+
         if not all_notes:
-            print("⚠️ Nenhuma nota .md encontrada")
+            print("⚠️ Nenhuma nota .md encontrada.")
+            log_pipeline_run("merge_notes", "skipped", {"reason": "Nenhuma nota encontrada"})
             return False
-        
-        # Mescla conteúdo
+
         print(f"\n🔄 Mesclando {len(all_notes)} notas...")
-        
-        merged_content = f"EXPORT OBSIDIAN VAULT — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        
+
+        # Ordena por pasta/nome para saída determinística
+        all_notes.sort(key=lambda n: (n['path'], n['name']))
+
+        ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+        lines = [
+            f"# OBSIDIAN VAULT EXPORT",
+            f"# Gerado em: {ts}",
+            f"# Total de notas: {len(all_notes)}",
+            f"# Pasta Drive: {folder_id}",
+            "",
+        ]
+
         for note in all_notes:
             title = note['name'].replace('.md', '')
-            content = note['content']
-            path = note['path']
-            
-            merged_content += f"--- NOTA: {title} ({path}) ---\n"
-            merged_content += f"{content}\n\n"
-        
-        print(f"✅ Conteúdo mesclado ({len(merged_content)} caracteres)")
-        
-        # Verifica se arquivo já existe
-        query = f"name='{output_filename}' and '{folder_id}' in parents"
-        results = drive_service.files().list(q=query).execute()
-        existing_files = results.get('files', [])
-        
-        file_metadata = {
-            'name': output_filename,
-            'mimeType': 'text/plain',
-            'parents': [folder_id]
-        }
-        
-        # Usa MediaIoBaseUpload para upload direto
-        fh = io.BytesIO(merged_content.encode('utf-8'))
-        media = MediaIoBaseUpload(
-            fh,
-            mimetype='text/plain',
-            resumable=True
-        )
-        
-        if existing_files:
-            # Atualiza arquivo existente
-            file_id = existing_files[0]['id']
-            drive_service.files().update(
-                fileId=file_id,
-                media_body=media,
-                fields='id'
-            ).execute()
-            print(f"✅ Arquivo atualizado: {output_filename}")
-        else:
-            # Cria novo arquivo
-            drive_service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id'
-            ).execute()
-            print(f"✅ Arquivo criado: {output_filename}")
-        
+            path = note['path'] or '/'
+            modified = note['modified'][:10] if note['modified'] else 'N/A'
+
+            lines.append(f"\n{'─'*60}")
+            lines.append(f"NOTA: {title}")
+            lines.append(f"PATH: {path} | MODIFICADO: {modified}")
+            lines.append(f"{'─'*60}")
+            lines.append(note['content'].strip())
+            lines.append("")
+
+        merged_content = "\n".join(lines)
+        total_chars = len(merged_content)
+        print(f"✅ Conteúdo mesclado: {total_chars:,} chars ({total_chars/1024:.1f} KB)")
+
+        # Cria ou atualiza o arquivo de saída
+        file_id = drive.upsert_file(output_filename, merged_content, folder_id)
+
+        print(f"✅ {output_filename} salvo no Drive (ID: {file_id})")
+        log_pipeline_run("merge_notes", "success", {
+            "notes_count": len(all_notes),
+            "total_chars": total_chars,
+            "file_id": file_id,
+        })
         return True
-        
+
+    except EnvironmentError as e:
+        print(f"❌ Configuração: {e}")
+        log_pipeline_run("merge_notes", "error", error=str(e))
+        return False
     except Exception as e:
         print(f"❌ Erro ao mesclar notas: {e}")
         import traceback
         traceback.print_exc()
+        log_pipeline_run("merge_notes", "error", error=str(e))
         return False
 
 
+# ── CLI ─────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     import argparse
-    
-    parser = argparse.ArgumentParser(description='Mescla notas do Obsidian')
-    parser.add_argument('--folder-id', required=True, help='ID da pasta do Obsidian')
+
+    parser = argparse.ArgumentParser(description='Mescla notas do Obsidian em um arquivo TXT')
+    parser.add_argument('--folder-id', help='ID da pasta do Obsidian (opcional, usa env)')
     parser.add_argument('--output', default='Obsidian_Master.txt', help='Nome do arquivo de saída')
-    
+
     args = parser.parse_args()
-    
-    success = merge_obsidian_notes(args.folder_id, args.output)
-    
+
+    folder_id = args.folder_id or os.getenv('OBSIDIAN_VAULT_FOLDER_ID')
+
+    if not folder_id:
+        print("❌ folder-id obrigatório via --folder-id ou OBSIDIAN_VAULT_FOLDER_ID")
+        sys.exit(1)
+
+    success = merge_obsidian_notes(folder_id, args.output)
+
     if success:
         print("\n🎉 Processo concluído com sucesso!")
-        print("💡 Execute o auto_sync para atualizar o NotebookLM")
     else:
         print("\n❌ Processo falhou")
+        sys.exit(1)

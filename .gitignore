@@ -4,6 +4,10 @@ configuracoes_pipeline.txt
 *.env
 .env
 
+# Estado de sincronização (gerado automaticamente, não commitar)
+.last_sync.json
+.last_hash.txt
+
 # Dados sensíveis
 *_secret.txt
 *_private.txt
@@ -50,10 +54,12 @@ desktop.ini
 *.swo
 *~
 
-# Logs
+# Logs (gerados automaticamente)
 *.log
 logs/
+logs/*.jsonl
 
 # Arquivos temporários
 *.tmp
 *.temp
+teste_*.html

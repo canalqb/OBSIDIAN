@@ -1,11 +1,17 @@
-# Google API Client Libraries
+﻿# Google API Client Libraries
 google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.0.0
 google-auth>=2.23.0
 
-# Additional dependencies
+# HTTP e utilitarios
 requests>=2.31.0
+
+# API REST local (opcional — so necessario para obsidian_api.py)
 flask>=2.3.0
 
-# NotebookLM (unofficial API)
-notebooklm-py>=0.4.0
+# Upload YouTube (usa as mesmas libs Google)
+# Nenhuma dependencia extra — youtube_uploader.py usa google-api-python-client
+
+# NotebookLM (API nao oficial — pode quebrar com atualizacoes do Google)
+# Instale separadamente se necessario: pip install notebooklm-py
+# notebooklm-py>=0.4.0

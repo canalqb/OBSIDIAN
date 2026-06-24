@@ -1,0 +1,115 @@
+﻿name: Publish Post Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      post_id:
+        description: "ID do post no Blogger"
+        required: true
+        type: string
+      video_title:
+        description: "Titulo do video no YouTube"
+        required: true
+        type: string
+      force_generate:
+        description: "Forcar geracao mesmo sem mudancas"
+        required: false
+        default: "false"
+        type: boolean
+
+concurrency:
+  group: publish-post-${{ inputs.post_id }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: "Publicar: ${{ inputs.video_title }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+      OBSIDIAN_VAULT_FOLDER_ID: ${{ secrets.OBSIDIAN_VAULT_FOLDER_ID }}
+      NOTEBOOKLM_NOTEBOOK_ID: ${{ secrets.NOTEBOOKLM_NOTEBOOK_ID }}
+      NOTEBOOKLM_OUTPUTS_FOLDER_ID: ${{ secrets.NOTEBOOKLM_OUTPUTS_FOLDER_ID }}
+      BLOGGER_BLOG_ID: "5982274115355506187"
+      PYTHONPATH: ${{ github.workspace }}/scripts
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          echo "Dependencias instaladas"
+
+      - name: "Step 1/4 — Sincronizar com NotebookLM"
+        id: sync_nlm
+        continue-on-error: true
+        run: |
+          echo "Sincronizando com NotebookLM..."
+          python scripts/sync_to_notebooklm.py \
+            --notebook-id "$NOTEBOOKLM_NOTEBOOK_ID"
+
+      - name: "Step 2/4 — Gerar Audio Overview"
+        id: gen_audio
+        if: steps.sync_nlm.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "Gerando Audio Overview..."
+          python scripts/save_notebooklm_video.py generate-audio \
+            "Resuma os principais topicos de forma clara e envolvente"
+
+      - name: "Step 3/4 — Gerar Video Overview"
+        id: gen_video
+        if: steps.sync_nlm.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "Gerando Video Overview..."
+          python scripts/save_notebooklm_video.py generate-video \
+            "Crie um video resumindo os principais insights das fontes"
+
+      - name: "Step 4/4 — Baixar e salvar no Drive"
+        id: download_media
+        if: steps.sync_nlm.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "Baixando media para o Drive..."
+          python scripts/save_notebooklm_video.py download
+
+      - name: Resumo da etapa NotebookLM
+        if: always()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Resultado NotebookLM" >> $GITHUB_STEP_SUMMARY
+          echo "| Etapa | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Sync NotebookLM | ${{ steps.sync_nlm.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gerar Audio | ${{ steps.gen_audio.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gerar Video | ${{ steps.gen_video.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Download Media | ${{ steps.download_media.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Post ID:** ${{ inputs.post_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Video:** ${{ inputs.video_title }}" >> $GITHUB_STEP_SUMMARY
+          
+      - name: Notificar falha
+        if: failure()
+        run: |
+          echo "Pipeline falhou!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Acao recomendada:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Verifique os logs acima" >> $GITHUB_STEP_SUMMARY
+          echo "2. Execute manualmente no NotebookLM" >> $GITHUB_STEP_SUMMARY
+          echo "3. Apos gerar o video, rode youtube_uploader.py manualmente" >> $GITHUB_STEP_SUMMARY

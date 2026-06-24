@@ -1,0 +1,104 @@
+﻿name: YouTube Upload Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_file_id:
+        description: "ID do arquivo de video no Google Drive"
+        required: true
+        type: string
+      post_id:
+        description: "ID do post no Blogger para atualizar"
+        required: true
+        type: string
+      video_title:
+        description: "Titulo do video no YouTube"
+        required: true
+        type: string
+      privacy:
+        description: "Privacidade do video"
+        required: false
+        default: "private"
+        type: choice
+        options:
+          - private
+          - unlisted
+
+jobs:
+  upload:
+    name: "Upload YouTube: ${{ inputs.video_title }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+      BLOGGER_BLOG_ID: "5982274115355506187"
+      PYTHONPATH: ${{ github.workspace }}/scripts
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Baixar video do Google Drive
+        id: download
+        run: |
+          echo "Baixando video do Drive (ID: ${{ inputs.video_file_id }})..."
+          python -c "
+from drive_client import DriveClient
+dc = DriveClient()
+raw = dc.service.files().get_media(fileId='${{ inputs.video_file_id }}').execute()
+with open('/tmp/video.mp4', 'wb') as f:
+    f.write(raw)
+print('Video baixado')
+"
+          echo "file_path=/tmp/video.mp4" >> $GITHUB_OUTPUT
+
+      - name: Upload para YouTube (privado)
+        id: youtube
+        run: |
+          echo "Enviando para YouTube..."
+          python scripts/youtube_uploader.py \
+            --file /tmp/video.mp4 \
+            --title "${{ inputs.video_title }}" \
+            --description "Video gerado automaticamente pelo pipeline @CanalQb" \
+            --tags "@CanalQb, automacao" \
+            --privacy "${{ inputs.privacy }}"
+
+      - name: Atualizar post do Blogger com embed
+        id: blogger_update
+        run: |
+          echo "Atualizando post com embed do YouTube..."
+          python -c "
+from blogger_client import BloggerClient
+import os, json
+bc = BloggerClient()
+result = bc.add_youtube_embed(
+    blog_id='5982274115355506187',
+    post_id='${{ inputs.post_id }}',
+    video_id='${{ steps.youtube.outputs.video_id }}',
+    video_title='${{ inputs.video_title }}',
+)
+print(f'Post atualizado: {result.get(\"url\", \"\")}')
+"
+
+      - name: Resumo final
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## YouTube Upload Completo" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Video:** ${{ inputs.video_title }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Post ID:** ${{ inputs.post_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Privacidade:** ${{ inputs.privacy }}" >> $GITHUB_STEP_SUMMARY

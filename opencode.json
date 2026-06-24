@@ -1,0 +1,25 @@
+﻿{
+  "agents": {
+    "criar-post": {
+      "description": "Gera um post completo, publica no Blogger e inicia o pipeline de video",
+      "command": "python scripts/pipeline_orchestrator.py --html-content \"{html}\" --title \"{title}\" --labels \"{labels}\" --source opencode",
+      "options": {
+        "html": "Conteudo HTML completo do post (seguindo o padrao pclaude.md)",
+        "title": "Titulo SEO do post (30-60 caracteres)",
+        "labels": "Tags separadas por virgula (ex: tutorial,cripto,automacao)"
+      }
+    },
+    "notebooklm-status": {
+      "description": "Verifica se o pipeline do NotebookLM gerou novos videos",
+      "command": "python scripts/check_pipeline_status.py"
+    },
+    "publicar-video": {
+      "description": "Faz upload de um video do Drive para o YouTube e atualiza o post",
+      "command": "python scripts/youtube_uploader.py --file \"{file}\" --title \"{title}\" --privacy private"
+    }
+  },
+  "skills": [
+    "skills/gerar-post-blogger.md"
+  ],
+  "instructions": "Leia .opencode/instructions.md antes de comecar a trabalhar neste projeto."
+}

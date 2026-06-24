@@ -1,70 +1,194 @@
-name: Sync Obsidian to NotebookLM
+name: Sync Obsidian → NotebookLM Pipeline
 
+# ─────────────────────────────────────────────────────────────
+# Gatilhos:
+#   - A cada 6 horas (automático)
+#   - Push em Obsidian_Master.txt (quando agentes enviam via GitHub API)
+#   - Manual via GitHub Actions UI
+# ─────────────────────────────────────────────────────────────
 on:
   schedule:
-    - cron: '0 */6 * * *'  # A cada 6 horas
+    - cron: '0 */6 * * *'       # A cada 6 horas
+  push:
+    paths:
+      - 'Obsidian_Master.txt'   # Dispara quando agente faz commit direto
   workflow_dispatch:
+    inputs:
+      force_sync:
+        description: 'Forçar sync mesmo sem mudanças'
+        required: false
+        default: 'false'
+        type: boolean
+
+concurrency:
+  group: obsidian-pipeline
+  cancel-in-progress: false    # Não cancela runs em andamento (evita estado inconsistente)
 
 jobs:
   sync:
+    name: Sync Pipeline
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      GOOGLE_CLIENT_ID:        ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET:    ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REFRESH_TOKEN:    ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+      OBSIDIAN_VAULT_FOLDER_ID: ${{ secrets.OBSIDIAN_VAULT_FOLDER_ID }}
+      NOTEBOOKLM_NOTEBOOK_ID:  ${{ secrets.NOTEBOOKLM_NOTEBOOK_ID }}
+      NOTEBOOKLM_OUTPUTS_FOLDER_ID: ${{ secrets.NOTEBOOKLM_OUTPUTS_FOLDER_ID }}
+      PYTHONPATH: ${{ github.workspace }}/scripts
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      # ── Setup ──────────────────────────────────────────────────────────────
+
+      - name: Checkout repositório
+        uses: actions/checkout@v4
         with:
-          python-version: '3.10'
-      
-      - name: Install dependencies
+          fetch-depth: 1
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependências
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
-          pip install notebooklm-py  # API não oficial do NotebookLM
-      
-      - name: Check for changes in Obsidian_Master.txt
-        id: check_changes
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          OBSIDIAN_VAULT_FOLDER_ID: ${{ secrets.OBSIDIAN_VAULT_FOLDER_ID }}
-        run: python scripts/check_changes.py --folder-id $OBSIDIAN_VAULT_FOLDER_ID
-      
-      - name: Sync to NotebookLM if changed
-        if: steps.check_changes.outputs.has_changes == 'true'
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          OBSIDIAN_VAULT_FOLDER_ID: ${{ secrets.OBSIDIAN_VAULT_FOLDER_ID }}
-          NOTEBOOKLM_NOTEBOOK_ID: ${{ secrets.NOTEBOOKLM_NOTEBOOK_ID }}
-        run: python scripts/sync_to_notebooklm.py --notebook-id $NOTEBOOKLM_NOTEBOOK_ID
-      
-      - name: Save NotebookLM outputs to Drive
-        if: steps.check_changes.outputs.has_changes == 'true'
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          OBSIDIAN_VAULT_FOLDER_ID: ${{ secrets.OBSIDIAN_VAULT_FOLDER_ID }}
-        run: python scripts/save_notebooklm_outputs.py --folder-id $OBSIDIAN_VAULT_FOLDER_ID
-      
-      - name: Generate NotebookLM video overview
-        if: steps.check_changes.outputs.has_changes == 'true'
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          NOTEBOOKLM_NOTEBOOK_ID: ${{ secrets.NOTEBOOKLM_NOTEBOOK_ID }}
-        run: python scripts/save_notebooklm_video.py generate-video "Resuma os principais pontos das fontes"
-      
-      - name: Save NotebookLM videos/audio to Drive
-        if: steps.check_changes.outputs.has_changes == 'true'
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          NOTEBOOKLM_NOTEBOOK_ID: ${{ secrets.NOTEBOOKLM_NOTEBOOK_ID }}
-          NOTEBOOKLM_OUTPUTS_FOLDER_ID: ${{ secrets.OBSIDIAN_VAULT_FOLDER_ID }}
-        run: python scripts/save_notebooklm_video.py download
+          echo "✅ Dependências instaladas"
+
+      # ── Restaurar estado de sincronização ──────────────────────────────────
+
+      - name: Restaurar estado da última sincronização
+        uses: actions/cache@v4
+        with:
+          path: .last_sync.json
+          key: sync-state-${{ github.run_id }}
+          restore-keys: |
+            sync-state-
+
+      # ── Verificação de mudanças ────────────────────────────────────────────
+
+      - name: Verificar mudanças no Obsidian_Master.txt
+        id: check
+        run: |
+          # Se push no Obsidian_Master.txt, considera mudanças sem chamar Drive
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "last_modified=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+            echo "📝 Push detectado — pulando verificação Drive"
+          elif [ "${{ inputs.force_sync }}" = "true" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "⚡ Sync forçado pelo usuário"
+          else
+            python scripts/check_changes.py
+          fi
+
+      - name: Resumo da verificação
+        run: |
+          echo "## Verificação de Mudanças" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tem mudanças:** ${{ steps.check.outputs.has_changes }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Último modificado:** ${{ steps.check.outputs.last_modified }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+
+      # ── Sincronização com NotebookLM ───────────────────────────────────────
+
+      - name: Sincronizar com NotebookLM
+        id: sync_nlm
+        if: steps.check.outputs.has_changes == 'true'
+        continue-on-error: true      # Não bloqueia o pipeline se NLM API falhar
+        run: |
+          echo "🔄 Sincronizando com NotebookLM..."
+          python scripts/sync_to_notebooklm.py \
+            --notebook-id "$NOTEBOOKLM_NOTEBOOK_ID"
+
+      - name: Registrar resultado da sincronização
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          if [ "${{ steps.sync_nlm.outcome }}" = "success" ]; then
+            echo "✅ NotebookLM sincronizado" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Sincronização com NotebookLM falhou (API não oficial pode ter mudado)" >> $GITHUB_STEP_SUMMARY
+            echo "💡 Atualize manualmente em notebooklm.google.com" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # ── Geração de vídeo ───────────────────────────────────────────────────
+
+      - name: Gerar Audio Overview
+        id: gen_audio
+        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "🎙️ Gerando Audio Overview..."
+          python scripts/save_notebooklm_video.py generate-audio \
+            "Resuma os principais tópicos de forma clara e envolvente"
+
+      - name: Gerar Video Overview
+        id: gen_video
+        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "🎬 Gerando Video Overview..."
+          python scripts/save_notebooklm_video.py generate-video \
+            "Crie um vídeo resumindo os principais insights das fontes"
+
+      # ── Salvar outputs no Drive ────────────────────────────────────────────
+
+      - name: Salvar outputs no Drive
+        id: save_outputs
+        if: steps.check.outputs.has_changes == 'true'
+        continue-on-error: true
+        run: |
+          echo "💾 Salvando outputs no Drive..."
+          python scripts/save_notebooklm_outputs.py \
+            --folder-id "$OBSIDIAN_VAULT_FOLDER_ID"
+
+      - name: Baixar vídeos e áudios para o Drive
+        id: download_media
+        if: >
+          steps.check.outputs.has_changes == 'true' &&
+          (steps.gen_audio.outcome == 'success' || steps.gen_video.outcome == 'success')
+        continue-on-error: true
+        run: |
+          echo "📥 Baixando media para o Drive..."
+          python scripts/save_notebooklm_video.py download
+
+      # ── Salvar estado de sincronização ─────────────────────────────────────
+
+      - name: Salvar estado da sincronização
+        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: .last_sync.json
+          key: sync-state-${{ github.run_id }}
+
+      # ── Resumo final ───────────────────────────────────────────────────────
+
+      - name: Resumo final do pipeline
+        if: always()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Resultados do Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Etapa | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Detectar mudanças | ${{ steps.check.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sync NotebookLM | ${{ steps.sync_nlm.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gerar Audio | ${{ steps.gen_audio.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gerar Vídeo | ${{ steps.gen_video.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Salvar outputs | ${{ steps.save_outputs.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Download media | ${{ steps.download_media.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+
+      # ── Notificação de falha crítica ───────────────────────────────────────
+
+      - name: Notificar falha crítica
+        if: failure()
+        run: |
+          echo "❌ Pipeline falhou em etapa crítica!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Ação recomendada:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Verifique os logs acima" >> $GITHUB_STEP_SUMMARY
+          echo "2. Confirme que os secrets do repositório estão configurados" >> $GITHUB_STEP_SUMMARY
+          echo "3. Teste localmente: \`python scripts/check_changes.py\`" >> $GITHUB_STEP_SUMMARY
