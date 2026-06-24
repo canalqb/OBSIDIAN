@@ -12,6 +12,8 @@ token.json
 service_account.json
 client_config.json
 temp_*.txt
+refresh_token.txt
+service_account_test.json
 
 # Google Apps Script (se houver arquivos locais)
 .clasp.json
