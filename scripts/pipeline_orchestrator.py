@@ -1,4 +1,4 @@
-﻿"""
+"""
 pipeline_orchestrator.py
 Orquestrador local: publica no Blogger, envia ao GitHub, dispara workflow.
 O restante (NotebookLM -> YouTube -> update post) roda no GitHub Actions.

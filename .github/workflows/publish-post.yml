@@ -1,4 +1,4 @@
-﻿name: Publish Post Pipeline
+name: Publish Post Pipeline
 
 on:
   workflow_dispatch:
