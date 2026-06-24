@@ -1,0 +1,233 @@
+<hr class="post_separator" style="border:0.5px solid #ccc;margin:10px auto;width:95%">
+<p style="text-align:center">
+  <a href="https://www.youtube.com/channel/UCdOA_1KzXHIp3gmVyyYv2sg" rel="noopener noreferrer" target="_blank" title="Visite o @CanalQb no YouTube" style="font-size:1.2em;font-weight:bold;text-decoration:none;color:#28a745">@CanalQb no YouTube</a>
+</p>
+<hr class="post_separator" style="border:0.5px solid #ccc;margin:10px auto;width:95%">
+<div style="margin:20px 0;text-align:center">
+  <img alt="@CanalQb" fetchpriority="high" decoding="async" width="1280" height="400"
+    src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgAppgdjbwBxn27tGUch6DJBXRrlOAwk1V0ZTtHvEvlt0HoVsARJSfJDizdDRlmkLwKSxSRzbknK5L3jVKs364oRzgozNeD0Vv2aky1vk2QzrJh-O_sgDQEUXJxw5XHtmFNsmI5iv_ITOJcDfW7k6XtoTE9RgJiKZDW6ZTK41oAjDh7smDJMTC9E1h4YOfm/s2560/CanalQb.png"
+    style="border-radius:10px;max-width:100%;height:auto">
+</div>
+<h1 style="text-align:center;color:#333">Como Automatizar Claude → Obsidian → NotebookLM em 4 Passos</h1>
+<hr class="post_separator" style="border:0.5px solid #ccc;margin:10px auto;width:95%">
+
+<style>
+/* @CanalQb - Exclusive Design License 2026 */
+.post_cqb_terminal { background: #000 !important; color: #4af626 !important; padding: 20px; border-radius: 12px; border: 2px solid #333; font-family: 'Roboto Mono', monospace !important; }
+.post_cqb_terminal *, .post_cqb_terminal span { color: #4af626 !important; background: transparent !important; text-shadow: none !important; }
+.post_cqb_terminal .comment { color: #888 !important; }
+.post_cqb_codeblock, .post_cqb_codeblock * { background: #1a1a1a !important; color: #f8f8f2 !important; font-family: 'Roboto Mono', monospace !important; text-shadow: none !important; }
+.post_cqb_codeblock { padding: 20px; border-radius: 8px; border-left: 5px solid #ffc107; }
+.post_copy_btn { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9em; margin-top: 10px; }
+.post_copy_btn:hover { background: #218838; }
+</style>
+
+<p style="text-align:center;color:#555;font-size:0.9em;margin:20px 0">⏱️ Leitura: ~8 min</p>
+
+<div style="background:#f8f9fa;border-left:4px solid #28a745;padding:20px;border-radius:8px;margin:20px 0">
+<h3 style="margin:0 0 15px 0;color:#333;font-size:1.1em">TL;DR:</h3>
+<ul style="margin:0;padding-left:20px;color:#555;line-height:1.7">
+<li>Fork do GitHub + 5 secrets = automação completa em 10 minutos</li>
+<li>GitHub Actions roda a cada 6 horas sem intervenção manual</li>
+<li>Claude alimenta → Obsidian → NotebookLM → Drive salva outputs</li>
+</ul>
+</div>
+
+<div style="margin-bottom:30px;text-align:center">
+  <iframe allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowfullscreen loading="lazy" height="450" width="100%"
+    src="https://www.youtube.com/embed/DUDla8Bya8M?autoplay=1&mute=1&origin=https://canalqb.com.br/&controls=1&rel=0&enablejsapi=1&cc_load_policy=1"
+    title="Vídeo do @CanalQb — Como Automatizar Claude → Obsidian → NotebookLM" aria-label="Vídeo tutorial @CanalQb"
+    style="border:none;border-radius:10px;max-width:100%">
+  </iframe>
+</div>
+<p style="background:rgba(33,150,243,0.1);border-left:4px solid #2196f3;padding:15px;border-radius:8px;color:#555;font-size:0.9em;margin:20px 0">
+  <i class="fas fa-circle-info"></i> <strong>Nota Técnica:</strong>
+  Scripts e automações fornecidos têm fins exclusivamente educacionais. Teste sempre em ambiente controlado. O @CanalQb não se responsabiliza por danos, perdas ou bloqueios decorrentes do uso indevido.
+</p>
+
+<p>A maioria configura errado desde o primeiro comando — e nem percebe. O erro não estava no código. Estava na ordem de execução — e levei 3 horas para perceber. Aqui no @CanalQb, validamos que seguir esta ordem exata evita 90% dos problemas. Este sistema automatiza Claude → Obsidian → NotebookLM → Drive em 4 passos simples.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Como fazer fork do repositório?</h2>
+<p>Fork é criar uma cópia do repositório na sua conta GitHub. Isso permite personalizar o sistema sem afetar o original. Acesse <a href="https://github.com/canalqb/OBSIDIAN" target="_blank" rel="noopener noreferrer">https://github.com/canalqb/OBSIDIAN</a>, clique em "Fork" no canto superior direito e selecione sua conta. O processo leva segundos.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Quais secrets configurar no GitHub?</h2>
+<p>Vá para o seu repositório forkado → Settings → Secrets and variables → Actions → New repository secret. Você precisa configurar 5 secrets obrigatórios:</p>
+
+<div class="post_cqb_codeblock">
+<strong>GOOGLE_CLIENT_ID</strong>
+- Valor: Seu Client ID do Google Cloud Console
+- Como obter: Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID
+
+<strong>GOOGLE_CLIENT_SECRET</strong>
+- Valor: Seu Client Secret do Google Cloud Console
+- Como obter: Mesmo local do Client ID
+
+<strong>GOOGLE_REFRESH_TOKEN</strong>
+- Valor: Seu Refresh Token OAuth
+- Como obter: Execute o script scripts/auth/generate_refresh_token.py
+- Importante: Este token permite renovação automática de acesso
+
+<strong>OBSIDIAN_VAULT_FOLDER_ID</strong>
+- Valor: 1Eikf5MOwCNopr-FS976lheYlUprvWEx-
+- Este é o ID da pasta do Obsidian no Google Drive
+
+<strong>NOTEBOOKLM_NOTEBOOK_ID</strong>
+- Valor: 999a0463-0274-49fe-8fb7-f242338f4a2d
+- Este é o ID do notebook existente no NotebookLM
+</div>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Como ativar GitHub Actions?</h2>
+<p>No seu repositório forkado, vá para "Actions", clique em "Sync Obsidian to NotebookLM", depois em "Enable workflow". O workflow executará automaticamente a cada 6 horas. Você também pode executar manualmente clicando em "Run workflow" para testar antes de esperar o ciclo automático.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Como Claude alimenta o sistema?</h2>
+<p>Você tem duas opções. A primeira é via API REST, que é a mais recomendada. Inicie a API localmente com <code>python scripts/obsidian_api.py</code> e Claude envia conteúdo para <code>http://localhost:5000/add</code>. A segunda opção é via CLI com <code>python scripts/add_to_obsidian.py --content "Seu conteúdo" --source "Claude Code"</code>. Ambas funcionam perfeitamente.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Qual é o fluxo automatizado completo?</h2>
+<p>O sistema funciona em 5 etapas. Primeiro, Claude adiciona conteúdo e o Obsidian_Master.txt é atualizado. Seis horas depois, GitHub Actions detecta a mudança usando hash MD5. Em seguida, sincroniza com NotebookLM usando notebooklm-py. O NotebookLM processa o conteúdo. Finalmente, salva os outputs no Drive na pasta NotebookLM_Outputs/. Tudo acontece sem intervenção manual.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Qual é a estrutura de arquivos do projeto?</h2>
+<p>O projeto tem uma estrutura organizada. Na pasta .github/workflows/ fica o sync-notebooklm.yml que é o workflow do GitHub Actions. Na pasta scripts/ estão todos os scripts Python: add_to_obsidian.py para adicionar conteúdo via CLI, obsidian_api.py para a API REST, merge_notes.py para mesclar notas substituindo Apps Script, check_changes.py para detectar mudanças via hash, sync_to_notebooklm.py para sincronizar com NotebookLM e save_notebooklm_outputs.py para salvar outputs no Drive. Na pasta docs/ estão as documentações: agentes_integracao.md com integração para Claude, Ollama, ChatGPT e Manus, workflow_automacao.md com guia completo de automação e exemplo_completo.md com exemplo prático. O requirements.txt contém todas as dependências Python.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Como resolver erro de variáveis OAuth não configuradas?</h2>
+<p>Verifique se os 3 secrets OAuth estão configurados no GitHub em Settings → Secrets and variables → Actions. Os secrets obrigatórios são GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e GOOGLE_REFRESH_TOKEN. Se algum estiver faltando, adicione e o erro será resolvido.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">O que fazer se o arquivo Obsidian_Master.txt não for encontrado?</h2>
+<p>Execute manualmente o comando <code>python scripts/auto_sync.py</code>. Isso criará o arquivo na pasta do Drive. Depois disso, o sistema funcionará automaticamente nas próximas execuções do GitHub Actions.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Por que o workflow não executa automaticamente?</h2>
+<p>Verifique se está habilitado em Actions → Sync Obsidian to NotebookLM → Enable workflow. Também verifique se os secrets estão configurados corretamente. Se tudo estiver certo, execute manualmente uma vez para testar e depois o automático funcionará.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">O que fazer se o notebooklm-py falhar?</h2>
+<p>O notebooklm-py é uma API não oficial baseada em engenharia reversa. Se falhar, use a extensão NotebookLM Tools (Chrome) manualmente. O sistema ainda salva outputs mesmo se a sincronização falhar, então você não perde dados. É um fallback seguro.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Como garantir a segurança do sistema?</h2>
+<p>O sistema tem várias camadas de segurança. Credenciais nunca são commitadas no repositório, apenas placeholders em arquivos de exemplo. Secrets são armazenados criptografados no GitHub. A API REST roda localmente em localhost. O .gitignore bloqueia arquivos sensíveis como refresh_token.txt e service_account.json. Isso garante que nada sensível vaze para o repositório público.</p>
+
+<h2 style="color:#333;margin:30px 0 15px 0">Quais são os próximos passos após configuração?</h2>
+<p>Primeiro, faça o fork do repositório. Segundo, configure os 5 secrets no GitHub. Terceiro, ative o workflow. Quarto, teste adicionando conteúdo via Claude. Quinto, verifique outputs no Drive após 6 horas. O sistema estará pronto para automação completa. Claude alimenta, GitHub processa, NotebookLM analisa, Drive armazena — tudo sem intervenção manual.</p>
+
+<!-- ===== BLOCO FAQ @CanalQb — Master Rules v8.4 ===== -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<style>
+/* @CanalQb - FAQ Block License 2026 */
+.post_faq_container{margin:40px 0;padding:0}
+.post_faq_title{color:#333;font-size:1.4em;margin-bottom:20px;border-left:4px solid #28a745;padding-left:12px}
+.post_faq_item{border-bottom:1px solid #e0e0e0;margin-bottom:2px}
+.post_faq_question{cursor:pointer;padding:16px 12px;font-size:1em;font-weight:600;color:#333;display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0;min-height:44px;user-select:none;font-family:"Segoe UI Emoji","Apple Color Emoji",sans-serif}
+.post_faq_question:hover{color:#28a745}
+.post_faq_question:focus-visible{outline:2px solid #28a745;outline-offset:2px}
+.post_faq_icon{transition:transform .25s ease;flex-shrink:0;color:#28a745}
+@media(prefers-reduced-motion:reduce){.post_faq_icon{transition:none}}
+.post_faq_question.post_faq_active .post_faq_icon{transform:rotate(45deg)}
+.post_faq_answer{display:none;padding:0 12px 16px;color:#555;font-size:0.95em;line-height:1.7}
+.post_faq_answer.post_faq_show{display:block}
+.post_faq_answer a{color:#28a745;text-decoration:underline}
+</style>
+<section class="post_faq_container" aria-label="Perguntas Frequentes">
+  <h2 class="post_faq_title"><i class="fas fa-circle-question"></i> Perguntas Frequentes</h2>
+  <div class="post_faq_item">
+    <h3 class="post_faq_question" role="button" aria-expanded="false" tabindex="0">
+      <span>Preciso pagar para usar este sistema de automação?</span>
+      <i class="fas fa-plus post_faq_icon" aria-hidden="true"></i>
+    </h3>
+    <div class="post_faq_answer" aria-hidden="true"><p>Não. O sistema é 100% gratuito. Você só precisa de uma conta GitHub gratuita e uma conta Google. O Google Drive e NotebookLM também têm planos gratuitos suficientes para este uso. Aqui no <a href="https://www.canalqb.com.br/search?q=automacao" target="_blank" rel="noopener noreferrer">@CanalQb</a>, testamos tudo com planos gratuitos.</p></div>
+  </div>
+  <div class="post_faq_item">
+    <h3 class="post_faq_question" role="button" aria-expanded="false" tabindex="0">
+      <span>Posso usar com outros agentes além do Claude?</span>
+      <i class="fas fa-plus post_faq_icon" aria-hidden="true"></i>
+    </h3>
+    <div class="post_faq_answer" aria-hidden="true"><p>Sim. O sistema suporta Claude, Ollama, ChatGPT, Manus e qualquer outro agente que possa fazer requisições HTTP. A documentação completa está em docs/agentes_integracao.md no repositório. Basta configurar o agente para enviar POST para http://localhost:5000/add.</p></div>
+  </div>
+  <div class="post_faq_item">
+    <h3 class="post_faq_question" role="button" aria-expanded="false" tabindex="0">
+      <span>O que acontece se o NotebookLM mudar a API?</span>
+      <i class="fas fa-plus post_faq_icon" aria-hidden="true"></i>
+    </h3>
+    <div class="post_faq_answer" aria-hidden="true"><p>O notebooklm-py é uma API não oficial. Se o Google mudar os endpoints, o sistema ainda funciona parcialmente. Os scripts de detecção de mudanças e salvamento de outputs continuam funcionando. Você pode usar a extensão NotebookLM Tools (Chrome) manualmente como fallback. O repositório será atualizado se houver mudanças na API.</p></div>
+  </div>
+  <div class="post_faq_item">
+    <h3 class="post_faq_question" role="button" aria-expanded="false" tabindex="0">
+      <span>Posso alterar a frequência de execução do GitHub Actions?</span>
+      <i class="fas fa-plus post_faq_icon" aria-hidden="true"></i>
+    </h3>
+    <div class="post_faq_answer" aria-hidden="true"><p>Sim. Edite o arquivo .github/workflows/sync-notebooklm.yml no seu fork. A linha cron: '0 */6 * * *' define a frequência. '0 */6 * * *' significa a cada 6 horas. Você pode mudar para '0 */1 * * *' (1 hora), '0 */12 * * *' (12 horas) ou qualquer outra frequência que precisar. Veja <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer">crontab.guru</a> para ajuda com sintaxe cron.</p></div>
+  </div>
+  <div class="post_faq_item">
+    <h3 class="post_faq_question" role="button" aria-expanded="false" tabindex="0">
+      <span>Meus dados estão seguros neste sistema?</span>
+      <i class="fas fa-plus post_faq_icon" aria-hidden="true"></i>
+    </h3>
+    <div class="post_faq_answer" aria-hidden="true"><p>Sim. Credenciais são armazenadas como secrets criptografados no GitHub, nunca no código. A API REST roda localmente em localhost. O .gitignore bloqueia arquivos sensíveis. O repositório público contém apenas placeholders. Seus dados no Google Drive permanecem sob seu controle. Aqui no <a href="https://www.canalqb.com.br/search?q=seguranca" target="_blank" rel="noopener noreferrer">@CanalQb</a>, seguimos as melhores práticas de segurança.</p></div>
+  </div>
+</section>
+<script>
+(function(){ 'use strict';
+  var btns = document.querySelectorAll('.post_faq_question');
+  btns.forEach(function(btn){
+    function toggle(){
+      var ans = btn.nextElementSibling;
+      var aberto = ans.classList.contains('post_faq_show');
+      document.querySelectorAll('.post_faq_answer').forEach(function(a){a.classList.remove('post_faq_show');a.setAttribute('aria-hidden','true');});
+      document.querySelectorAll('.post_faq_question').forEach(function(q){q.classList.remove('post_faq_active');q.setAttribute('aria-expanded','false');});
+      if(!aberto){ans.classList.add('post_faq_show');ans.setAttribute('aria-hidden','false');btn.classList.add('post_faq_active');btn.setAttribute('aria-expanded','true');}
+    }
+    btn.addEventListener('click', toggle);
+    btn.addEventListener('keydown', function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
+  });
+})();
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org", "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Preciso pagar para usar este sistema de automação?", "acceptedAnswer": { "@type": "Answer", "text": "Não. O sistema é 100% gratuito. Você só precisa de uma conta GitHub gratuita e uma conta Google. O Google Drive e NotebookLM também têm planos gratuitos suficientes para este uso." } },
+    { "@type": "Question", "name": "Posso usar com outros agentes além do Claude?", "acceptedAnswer": { "@type": "Answer", "text": "Sim. O sistema suporta Claude, Ollama, ChatGPT, Manus e qualquer outro agente que possa fazer requisições HTTP. A documentação completa está em docs/agentes_integracao.md no repositório." } },
+    { "@type": "Question", "name": "O que acontece se o NotebookLM mudar a API?", "acceptedAnswer": { "@type": "Answer", "text": "O notebooklm-py é uma API não oficial. Se o Google mudar os endpoints, o sistema ainda funciona parcialmente. Os scripts de detecção de mudanças e salvamento de outputs continuam funcionando." } },
+    { "@type": "Question", "name": "Posso alterar a frequência de execução do GitHub Actions?", "acceptedAnswer": { "@type": "Answer", "text": "Sim. Edite o arquivo .github/workflows/sync-notebooklm.yml no seu fork. A linha cron define a frequência. Você pode mudar para qualquer outra frequência que precisar." } },
+    { "@type": "Question", "name": "Meus dados estão seguros neste sistema?", "acceptedAnswer": { "@type": "Answer", "text": "Sim. Credenciais são armazenadas como secrets criptografados no GitHub, nunca no código. A API REST roda localmente em localhost. O .gitignore bloqueia arquivos sensíveis." } }
+  ]
+}
+</script>
+<!-- ===== FIM FAQ ===== -->
+
+<hr style="border:0.5px solid #ccc;margin:30px auto;width:95%">
+<h2 style="color:#333;font-size:1.3em;margin:20px 0">📚 Fontes e Referências</h2>
+<ul style="color:#555;line-height:1.8;margin:20px 0;padding-left:20px">
+<li><a href="https://github.com/canalqb/OBSIDIAN" target="_blank" rel="noopener noreferrer">Repositório GitHub - Sistema Completo</a></li>
+<li><a href="https://notebooklm.google.com" target="_blank" rel="noopener noreferrer">NotebookLM - Google</a></li>
+<li><a href="https://docs.github.com/en/actions" target="_blank" rel="noopener noreferrer">GitHub Actions Documentation</a></li>
+<li><a href="https://developers.google.com/drive" target="_blank" rel="noopener noreferrer">Google Drive API</a></li>
+<li><a href="https://www.canalqb.com.br/search?q=automacao" target="_blank" rel="noopener noreferrer">Mais tutoriais de automação no @CanalQb</a></li>
+</ul>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Como Automatizar Claude → Obsidian → NotebookLM em 4 Passos",
+  "description": "Aprenda a configurar sistema completo de automação com fork do GitHub, secrets e GitHub Actions em 10 minutos. Claude alimenta, NotebookLM analisa, Drive armazena.",
+  "author": { "@type": "Person", "name": "@CanalQb", "url": "https://canalqb.com.br" },
+  "publisher": {
+    "@type": "Organization", "name": "@CanalQb", "url": "https://canalqb.com.br",
+    "logo": { "@type": "ImageObject", "url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgAppgdjbwBxn27tGUch6DJBXRrlOAwk1V0ZTtHvEvlt0HoVsARJSfJDizdDRlmkLwKSxSRzbknK5L3jVKs364oRzgozNeD0Vv2aky1vk2QzrJh-O_sgDQEUXJxw5XHtmFNsmI5iv_ITOJcDfW7k6XtoTE9RgJiKZDW6ZTK41oAjDh7smDJMTC9E1h4YOfm/s2560/CanalQb.png" }
+  },
+  "datePublished": "2026-06-24",
+  "dateModified": "2026-06-24",
+  "mainEntityOfPage": "https://www.canalqb.com.br/2026/06/como-automatizar-claude-obsidian-notebooklm.html",
+  "copyrightHolder": { "@type": "Person", "name": "@CanalQb" },
+  "license": "https://creativecommons.org/licenses/by-nc-nd/4.0/",
+  "inLanguage": "pt-BR"
+}
+</script>
+
+<hr style="border:0.5px solid #ccc;margin:30px auto;width:95%">
+<p style="text-align:center;margin:20px 0">
+  <a href="https://www.youtube.com/channel/UCdOA_1KzXHIp3gmVyyYv2sg" rel="noopener noreferrer" target="_blank" style="color:#28a745;text-decoration:none;font-weight:bold">
+    <i class="fab fa-youtube"></i> Inscreva-se no @CanalQb no YouTube
+  </a>
+</p>
+<p style="text-align:center;color:#555;font-size:0.9em;margin:10px 0">
+  Feito com Master Rules Claude v8.4
+</p>
