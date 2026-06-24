@@ -14,3 +14,6 @@ flask>=2.3.0
 
 # NotebookLM (API nao oficial — pode quebrar com atualizacoes do Google)
 notebooklm-py>=0.4.0
+
+# Google Sheets (usado pelo sheets_client.py)
+# ja incluso no google-api-python-client

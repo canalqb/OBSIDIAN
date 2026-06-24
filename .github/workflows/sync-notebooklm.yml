@@ -1,38 +1,51 @@
-name: Sync Obsidian NotebookLM Pipeline
+name: Processar Video do Post
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'
-  push:
-    paths:
-      - 'Obsidian_Master.txt'
   workflow_dispatch:
     inputs:
+      post_id:
+        description: 'ID do post no Blogger'
+        required: false
+        default: ''
+      post_url:
+        description: 'URL do post no Blogger'
+        required: false
+        default: ''
+      post_title:
+        description: 'Titulo do post'
+        required: false
+        default: ''
+      content_file:
+        description: 'Arquivo HTML do post (no repo)'
+        required: false
+        default: ''
       force_sync:
-        description: 'Forcar sync mesmo sem mudancas'
+        description: 'Forcar processamento mesmo sem pendencia'
         required: false
         default: 'false'
         type: boolean
+  schedule:
+    - cron: '0 */3 * * *'
 
 concurrency:
   group: obsidian-sync
   cancel-in-progress: false
 
 jobs:
-  sync:
-    name: Sync Pipeline
+  process:
+    name: Processar Post
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     env:
       GOOGLE_CLIENT_ID:        ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET:    ${{ secrets.GOOGLE_CLIENT_SECRET }}
       GOOGLE_REFRESH_TOKEN:    ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-      OBSIDIAN_VAULT_FOLDER_ID: ${{ secrets.OBSIDIAN_VAULT_FOLDER_ID }}
       NOTEBOOKLM_NOTEBOOK_ID:  ${{ secrets.NOTEBOOKLM_NOTEBOOK_ID }}
       NOTEBOOKLM_OUTPUTS_FOLDER_ID: ${{ secrets.NOTEBOOKLM_OUTPUTS_FOLDER_ID }}
-      NOTEBOOKLM_AUTH_JSON:  ${{ secrets.NOTEBOOKLM_AUTH_JSON }}
-      BLOGGER_BLOG_ID: "5982274115355506187"
+      NOTEBOOKLM_AUTH_JSON:    ${{ secrets.NOTEBOOKLM_AUTH_JSON }}
+      GOOGLE_SHEET:            ${{ secrets.GOOGLE_SHEET }}
+      BLOGGER_BLOG_ID:         "5982274115355506187"
       PYTHONPATH: ${{ github.workspace }}/scripts
 
     steps:
@@ -51,166 +64,342 @@ jobs:
           pip install -r requirements.txt
           echo "Dependencias instaladas"
 
-      - name: Extrair Post ID do Obsidian_Master.txt
-        id: extract
-        if: github.event_name == 'push'
+      - name: Buscar post pendente da planilha
+        id: sheet_pending
         run: |
-          if [ -f "Obsidian_Master.txt" ]; then
-            POST_ID=$(grep -m1 'Post ID:' Obsidian_Master.txt | sed 's/.*Post ID: //' | tr -d ' ')
-            if [ -n "$POST_ID" ]; then
-              echo "post_id=$POST_ID" >> $GITHUB_OUTPUT
-              echo "Post ID encontrado: $POST_ID"
-            else
-              echo "Nenhum Post ID encontrado"
-            fi
+          python scripts/check_pending_post.py
+        continue-on-error: true
+
+      - name: Definir dados do post
+        id: post_data
+        run: |
+          if [ -n "${{ inputs.post_id }}" ]; then
+            echo "post_id=${{ inputs.post_id }}" >> $GITHUB_OUTPUT
+            echo "post_url=${{ inputs.post_url }}" >> $GITHUB_OUTPUT
+            echo "post_title=${{ inputs.post_title }}" >> $GITHUB_OUTPUT
+          elif [ -f /tmp/pending_post.json ]; then
+            POST_ID=$(python -c "import json; d=json.load(open('/tmp/pending_post.json')); print(d.get('post_id',''))")
+            POST_URL=$(python -c "import json; d=json.load(open('/tmp/pending_post.json')); print(d.get('post_url',''))")
+            POST_TITLE=$(python -c "import json; d=json.load(open('/tmp/pending_post.json')); print(d.get('title',''))")
+            echo "post_id=$POST_ID" >> $GITHUB_OUTPUT
+            echo "post_url=$POST_URL" >> $GITHUB_OUTPUT
+            echo "post_title=$POST_TITLE" >> $GITHUB_OUTPUT
           fi
 
-      - name: Restaurar estado da ultima sincronizacao
-        uses: actions/cache@v4
-        with:
-          path: .last_sync.json
-          key: sync-state-${{ github.run_id }}
-          restore-keys: |
-            sync-state-
-
-      - name: Verificar mudancas no Obsidian_Master.txt
-        id: check
+      - name: Verificar se ha post para processar
+        id: has_post
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "last_modified=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
-            echo "Push detectado"
-          elif [ "${{ inputs.force_sync }}" = "true" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "Sync forado pelo usuario"
+          if [ -n "${{ steps.post_data.outputs.post_id }}" ]; then
+            echo "has_post=true" >> $GITHUB_OUTPUT
+            echo "Post: ${{ steps.post_data.outputs.post_title }}"
           else
-            python scripts/check_changes.py
+            echo "has_post=false" >> $GITHUB_OUTPUT
+            echo "Nenhum post pendente encontrado"
           fi
+
+      - name: Baixar conteudo do post do Blogger
+        if: steps.has_post.outputs.has_post == 'true'
+        run: |
+          python -c "
+          from blogger_client import BloggerClient
+          import os, json
+          bc = BloggerClient()
+          blog_id = os.getenv('BLOGGER_BLOG_ID', '5982274115355506187')
+          post = bc.get_post(blog_id, '${{ steps.post_data.outputs.post_id }}')
+          content = post.get('content', '')
+          title = post.get('title', '${{ steps.post_data.outputs.post_title }}')
+          with open('/tmp/post_content.html', 'w', encoding='utf-8') as f:
+              f.write(content)
+          with open('/tmp/post_meta.json', 'w') as f:
+              json.dump({'title': title, 'content_len': len(content)}, f)
+          print(f'Conteudo baixado: {len(content)} chars')
+          "
 
       - name: Sync NotebookLM
         id: sync_nlm
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.has_post.outputs.has_post == 'true'
         continue-on-error: true
         run: |
-          python scripts/sync_to_notebooklm.py \
-            --notebook-id "$NOTEBOOKLM_NOTEBOOK_ID"
+          python -c "
+          import asyncio, os
+          async def sync():
+              from notebooklm import NotebookLMClient
+              auth = os.getenv('NOTEBOOKLM_AUTH_JSON')
+              if auth: os.environ['NOTEBOOKLM_AUTH_JSON'] = auth
+              async with NotebookLMClient.from_storage() as client:
+                  nb_id = os.getenv('NOTEBOOKLM_NOTEBOOK_ID')
+                  nb = await client.notebooks.get(nb_id)
+                  print(f'Notebook: {nb.id}')
+                  source = await client.sources.add_file(nb_id, '/tmp/post_content.html', wait=True)
+                  print(f'Fonte adicionada: {source.id}')
+          asyncio.run(sync())
+          "
 
-      - name: Gerar Audio Overview
+      - name: Gerar Audio Overview (PT-BR)
         id: gen_audio
-        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.conclusion == 'success'
+        if: steps.has_post.outputs.has_post == 'true' && steps.sync_nlm.conclusion == 'success'
         continue-on-error: true
         run: |
-          python scripts/save_notebooklm_video.py generate-audio \
-            "Resuma os principais topicos de forma clara e envolvente"
+          python -c "
+          import asyncio, os
+          async def gen():
+              from notebooklm import NotebookLMClient
+              auth = os.getenv('NOTEBOOKLM_AUTH_JSON')
+              if auth: os.environ['NOTEBOOKLM_AUTH_JSON'] = auth
+              async with NotebookLMClient.from_storage() as client:
+                  nb_id = os.getenv('NOTEBOOKLM_NOTEBOOK_ID')
+                  print('Gerando Audio Overview em Portugues...')
+                  status = await client.artifacts.generate_audio(
+                      nb_id,
+                      instructions='Gere um audio em portugues brasileiro, tom didatico e envolvente, resumindo os principais pontos do post.'
+                  )
+                  print(f'Audio iniciado: {status.task_id}')
+                  await client.artifacts.wait_for_completion(nb_id, status.task_id)
+                  print('Audio Overview gerado com sucesso!')
+          asyncio.run(gen())
+          "
 
-      - name: Gerar Video Overview
+      - name: Gerar Video Overview (16:9, PT-BR, estilo personalizado)
         id: gen_video
-        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.conclusion == 'success'
+        if: steps.has_post.outputs.has_post == 'true' && steps.sync_nlm.conclusion == 'success'
         continue-on-error: true
         run: |
-          python scripts/save_notebooklm_video.py generate-video \
-            "Crie um video resumindo os principais insights das fontes"
+          python -c "
+          import asyncio, os
+          async def gen():
+              from notebooklm import NotebookLMClient
+              auth = os.getenv('NOTEBOOKLM_AUTH_JSON')
+              if auth: os.environ['NOTEBOOKLM_AUTH_JSON'] = auth
+              async with NotebookLMClient.from_storage() as client:
+                  nb_id = os.getenv('NOTEBOOKLM_NOTEBOOK_ID')
+                  print('Gerando Video Overview 16:9...')
+                  status = await client.artifacts.generate_video(
+                      nb_id,
+                      instructions=(
+                          'Idioma: portugues brasileiro. '
+                          'Formato: 16:9 horizontal. '
+                          'Estilo visual personalizado: cenario tecnologico moderno com fundo limpo, '
+                          'paleta de cores verde (#28a745) e azul (#2196f3), '
+                          'animacoes suaves de transicao, graficos explicativos simples. '
+                          'Apresentadores de IA devem focar em: '
+                          '1) explicacao pratica passo a passo, '
+                          '2) demonstracao de resultados reais com dados numericos, '
+                          '3) comparacao entre metodos tradicional vs automatizado, '
+                          '4) dicas de otimizacao que funcionaram em testes reais, '
+                          '5) alertas sobre erros comuns e como evita-los. '
+                          'Tom: didatico e direto, como um tutorial do @CanalQb.'
+                      )
+                  )
+                  print(f'Video iniciado: {status.task_id}')
+                  await client.artifacts.wait_for_completion(nb_id, status.task_id)
+                  print('Video Overview gerado com sucesso!')
+          asyncio.run(gen())
+          "
 
-      - name: Salvar outputs no Drive
-        id: save_outputs
-        if: steps.check.outputs.has_changes == 'true'
-        continue-on-error: true
-        run: |
-          python scripts/save_notebooklm_outputs.py \
-            --folder-id "$OBSIDIAN_VAULT_FOLDER_ID"
-
-      - name: Baixar medias para o Drive
+      - name: Baixar e salvar video no Drive
         id: download_media
         if: >
-          steps.check.outputs.has_changes == 'true' &&
-          (steps.gen_audio.outcome == 'success' || steps.gen_video.outcome == 'success')
+          steps.has_post.outputs.has_post == 'true' &&
+          (steps.gen_audio.conclusion == 'success' || steps.gen_video.conclusion == 'success')
         continue-on-error: true
         run: |
-          python scripts/save_notebooklm_video.py download
-
-      - name: Upload YouTube e atualizar Blog
-        id: youtube
-        if: steps.download_media.outcome == 'success'
-        continue-on-error: true
-        run: |
-          echo "Procurando video no Drive..."
           python -c "
-          from drive_client import DriveClient
-          import os, json, sys
-          dc = DriveClient()
-          folder_id = os.getenv('NOTEBOOKLM_OUTPUTS_FOLDER_ID', '1Eikf5MOwCNopr-FS976lheYlUprvWEx-')
-          files = dc.list_files(folder_id)
-          videos = [f for f in files if f['name'].endswith(('.mp4', '.webm', '.mov'))]
-          if not videos:
-              print('Nenhum video encontrado no Drive')
-              sys.exit(1)
-          latest = max(videos, key=lambda f: f.get('modifiedTime', ''))
-          print('Video encontrado:', latest['name'], '(ID:', latest['id'], ')')
-          raw = dc.service.files().get_media(fileId=latest['id']).execute()
-          with open('/tmp/video_notebooklm.mp4', 'wb') as fp:
-              fp.write(raw)
-          print('Video baixado para /tmp/video_notebooklm.mp4')
-          with open('/tmp/video_info.json', 'w') as fp:
-              json.dump({'file_id': latest['id'], 'name': latest['name']}, fp)
-          "
-          if [ -f /tmp/video_notebooklm.mp4 ]; then
-            TITLE=$(head -1 Obsidian_Master.txt 2>/dev/null | sed 's/^# Post: //' || echo "Video @CanalQb")
-            echo "Enviando video para YouTube (privado)..."
-            python scripts/youtube_uploader.py \
-              --file /tmp/video_notebooklm.mp4 \
-              --title "$TITLE" \
-              --description "Video gerado automaticamente pelo NotebookLM para @CanalQb" \
-              --tags "@CanalQb,automacao,NotebookLM" \
-              --privacy "private" 2>&1 | tee /tmp/youtube_result.txt
-            VIDEO_ID=$(grep -oP '"video_id": "\K[^"]+' /tmp/youtube_result.txt || echo "")
-            if [ -n "$VIDEO_ID" ]; then
-              echo "VIDEO_ID=$VIDEO_ID" >> $GITHUB_ENV
-              POST_ID="${{ steps.extract.outputs.post_id }}"
-              if [ -n "$POST_ID" ]; then
-                echo "Atualizando post do Blogger..."
-                python -c "
-                from blogger_client import BloggerClient
-                bc = BloggerClient()
-                result = bc.add_youtube_embed(
-                    blog_id='5982274115355506187',
-                    post_id='$POST_ID',
-                    video_id='$VIDEO_ID',
-                    video_title='$TITLE',
-                )
-                print('Post atualizado:', result.get('url', ''))
-                "
-              fi
-            fi
-          fi
+          import asyncio, os, json
+          from datetime import datetime
+          from google.oauth2.credentials import Credentials
+          from google.auth.transport.requests import Request
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
 
-      - name: Salvar estado da sincronizacao
-        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.conclusion == 'success'
-        uses: actions/cache/save@v4
-        with:
-          path: .last_sync.json
-          key: sync-state-${{ github.run_id }}
+          async def download():
+              from notebooklm import NotebookLMClient
+              auth = os.getenv('NOTEBOOKLM_AUTH_JSON')
+              if auth: os.environ['NOTEBOOKLM_AUTH_JSON'] = auth
+              async with NotebookLMClient.from_storage() as client:
+                  nb_id = os.getenv('NOTEBOOKLM_NOTEBOOK_ID')
+                  artifacts = await client.artifacts.list(nb_id)
+                  print(f'Artifacts encontrados: {len(artifacts)}')
+
+                  # Setup Drive
+                  cid = os.getenv('GOOGLE_CLIENT_ID')
+                  cs = os.getenv('GOOGLE_CLIENT_SECRET')
+                  rt = os.getenv('GOOGLE_REFRESH_TOKEN')
+                  creds = Credentials(token=None, refresh_token=rt,
+                      token_uri='https://oauth2.googleapis.com/token',
+                      client_id=cid, client_secret=cs,
+                      scopes=['https://www.googleapis.com/auth/drive'])
+                  creds.refresh(Request())
+                  drive = build('drive', 'v3', credentials=creds)
+                  folder_id = os.getenv('NOTEBOOKLM_OUTPUTS_FOLDER_ID')
+
+                  title = '${{ steps.post_data.outputs.post_title }}'
+                  saved = []
+                  for art in artifacts:
+                      art_title = art.get('title', 'artifact')
+                      art_id = art['id']
+                      ext = '.mp4' if art.get('mimeType', '').startswith('video') else '.wav'
+                      fname = f\"{title}{ext}\"
+                      fname = fname.replace('/', '_').replace(':', '_')
+                      temp = f'/tmp/{fname}'
+                      try:
+                          await client.artifacts.download(nb_id, art_id, temp)
+                          if os.path.exists(temp):
+                              size = os.path.getsize(temp)
+                              meta = {'name': fname, 'parents': [folder_id]}
+                              media = MediaFileUpload(temp, resumable=True)
+                              f = drive.files().create(body=meta, media_body=media, fields='id,name').execute()
+                              print(f'Salvo no Drive: {f[\"name\"]} (ID: {f[\"id\"]})')
+                              saved.append({'drive_id': f['id'], 'name': f['name'], 'path': temp})
+                              os.remove(temp)
+                      except Exception as e:
+                          print(f'Erro artifact {art_title}: {e}')
+
+                  json.dump(saved, open('/tmp/saved_media.json','w'))
+                  print(f'Total salvos: {len(saved)}')
+
+          asyncio.run(download())
+          "
+
+      - name: Upload YouTube
+        id: youtube
+        if: steps.download_media.conclusion == 'success'
+        continue-on-error: true
+        run: |
+          python -c "
+          import os, json, sys
+          from youtube_uploader import YouTubeUploader
+
+          if not os.path.exists('/tmp/saved_media.json'):
+              print('Nenhuma midia salva para upload')
+              sys.exit(1)
+
+          media_list = json.load(open('/tmp/saved_media.json'))
+          videos = [m for m in media_list if m['name'].endswith(('.mp4','.webm','.mov'))]
+          if not videos:
+              print('Nenhum video encontrado')
+              sys.exit(1)
+
+          video = videos[0]
+          title = '${{ steps.post_data.outputs.post_title }}' or 'Video @CanalQb'
+          uploader = YouTubeUploader()
+          result = uploader.upload_video(
+              file_path=video['path'],
+              title=title[:100],
+              description=f'Video gerado automaticamente pelo NotebookLM para @CanalQb.\\n\\nPost original: \${{ steps.post_data.outputs.post_url }}',
+              tags=['@CanalQb', 'automacao', 'NotebookLM', 'tutorial'],
+              privacy_status='unlisted',
+          )
+          json.dump(result, open('/tmp/youtube_result.json','w'))
+          print(f'YouTube ID: {result[\"video_id\"]}')
+          "
+
+      - name: Substituir ID do video no Blogger
+        id: replace_video
+        if: steps.youtube.conclusion == 'success'
+        continue-on-error: true
+        run: |
+          python -c "
+          import os, json, sys
+          if not os.path.exists('/tmp/youtube_result.json'):
+              print('Sem resultado do YouTube')
+              sys.exit(1)
+          result = json.load(open('/tmp/youtube_result.json'))
+          video_id = result.get('video_id', '')
+          if not video_id:
+              print('video_id vazio')
+              sys.exit(1)
+          from blogger_client import BloggerClient
+          bc = BloggerClient()
+          blog_id = os.getenv('BLOGGER_BLOG_ID', '5982274115355506187')
+          post_id = '${{ steps.post_data.outputs.post_id }}'
+          post = bc.get_post(blog_id, post_id)
+          content = post.get('content', '')
+          if 'DUDla8Bya8M' not in content:
+              print('Placeholder DUDla8Bya8M nao encontrado no post')
+              print('Verificando se ja foi substituido...')
+              if video_id in content:
+                  print(f'Video ID {video_id} ja presente no post')
+              sys.exit(0)
+          new_content = content.replace('DUDla8Bya8M', video_id)
+          count = content.count('DUDla8Bya8M')
+          updated = bc.update_post(blog_id, post_id, new_content)
+          print(f'Post atualizado! {count} ocorrencias substituidas')
+          print(f'URL: {updated.get(\"url\", \"\")}')
+          "
+
+      - name: Atualizar planilha
+        if: steps.replace_video.conclusion == 'success' || steps.youtube.conclusion == 'success'
+        continue-on-error: true
+        run: |
+          python -c "
+          import os, json
+          from sheets_client import SheetsClient
+          sheet_id = os.getenv('GOOGLE_SHEET')
+          if not sheet_id:
+              print('GOOGLE_SHEET nao configurado')
+              exit(0)
+          sc = SheetsClient()
+          post_url = '${{ steps.post_data.outputs.post_url }}'
+          if os.path.exists('/tmp/youtube_result.json'):
+              result = json.load(open('/tmp/youtube_result.json'))
+              video_id = result.get('video_id', '')
+              youtube_url = f'https://www.youtube.com/watch?v={video_id}'
+              sc.update_youtube_link(sheet_id, post_url, youtube_url)
+              print(f'YouTube link atualizado: {youtube_url}')
+          if os.path.exists('/tmp/saved_media.json'):
+              media = json.load(open('/tmp/saved_media.json'))
+              for m in media:
+                  drive_url = f'https://drive.google.com/file/d/{m[\"drive_id\"]}/view'
+                  sc.update_drive_link(sheet_id, post_url, drive_url)
+                  print(f'Drive link atualizado: {drive_url}')
+          "
+
+      - name: Limpar video do Drive
+        if: steps.replace_video.conclusion == 'success'
+        continue-on-error: true
+        run: |
+          python -c "
+          import os, json
+          from google.oauth2.credentials import Credentials
+          from google.auth.transport.requests import Request
+          from googleapiclient.discovery import build
+          if os.path.exists('/tmp/saved_media.json'):
+              media = json.load(open('/tmp/saved_media.json'))
+              cid = os.getenv('GOOGLE_CLIENT_ID')
+              cs = os.getenv('GOOGLE_CLIENT_SECRET')
+              rt = os.getenv('GOOGLE_REFRESH_TOKEN')
+              creds = Credentials(token=None, refresh_token=rt,
+                  token_uri='https://oauth2.googleapis.com/token',
+                  client_id=cid, client_secret=cs,
+                  scopes=['https://www.googleapis.com/auth/drive'])
+              creds.refresh(Request())
+              drive = build('drive', 'v3', credentials=creds)
+              for m in media:
+                  try:
+                      drive.files().delete(fileId=m['drive_id']).execute()
+                      print(f'Deletado do Drive: {m[\"name\"]}')
+                  except Exception as e:
+                      print(f'Erro ao deletar {m[\"name\"]}: {e}')
+          "
 
       - name: Resumo final
         if: always()
         run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Resultados do Pipeline" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Etapa | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Detectar mudancas | ${{ steps.check.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Post ID | ${{ steps.post_data.outputs.post_id || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Sync NotebookLM | ${{ steps.sync_nlm.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Gerar Audio | ${{ steps.gen_audio.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Gerar Video | ${{ steps.gen_video.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Salvar outputs | ${{ steps.save_outputs.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Download media | ${{ steps.download_media.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Audio Overview | ${{ steps.gen_audio.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Video Overview | ${{ steps.gen_video.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Download/Drive | ${{ steps.download_media.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| YouTube Upload | ${{ steps.youtube.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Post ID: ${{ steps.extract.outputs.post_id || 'N/A' }}" >> $GITHUB_STEP_SUMMARY
-          echo "Video ID: ${{ env.VIDEO_ID || 'N/A' }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Replace Video ID | ${{ steps.replace_video.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Planilha | ${{ steps.sheet_pending.outcome || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
 
       - name: Notificar falha
         if: failure()
         run: |
           echo "Pipeline falhou!" >> $GITHUB_STEP_SUMMARY
-          echo "Verifique os logs acima" >> $GITHUB_STEP_SUMMARY
+          echo "Verifique os logs acima para detalhes" >> $GITHUB_STEP_SUMMARY
