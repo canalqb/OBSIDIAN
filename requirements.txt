@@ -13,5 +13,4 @@ flask>=2.3.0
 # Nenhuma dependencia extra — youtube_uploader.py usa google-api-python-client
 
 # NotebookLM (API nao oficial — pode quebrar com atualizacoes do Google)
-# Instale separadamente se necessario: pip install notebooklm-py
-# notebooklm-py>=0.4.0
+notebooklm-py>=0.4.0
