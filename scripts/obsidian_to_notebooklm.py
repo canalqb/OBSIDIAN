@@ -229,12 +229,13 @@ class ObsidianNotebookLMPipeline:
         
         return file
     
-    def run_pipeline(self, obsidian_folder_id, output_filename='Obsidian_Master.txt'):
+    def run_pipeline(self, obsidian_folder_id, output_folder_id=None, output_filename='Obsidian_Master.txt'):
         """
         Executa pipeline completo
         
         Args:
             obsidian_folder_id: ID da pasta do Obsidian no Drive
+            output_folder_id: ID da pasta onde salvar o arquivo (opcional)
             output_filename: Nome do arquivo de saída
         """
         print("🚀 Iniciando pipeline Obsidian → NotebookLM")
@@ -252,7 +253,7 @@ class ObsidianNotebookLMPipeline:
         
         # 3. Grava no Drive usando OAuth
         print("\n💾 Gravando no Google Drive...")
-        self.write_to_drive(merged_content, output_filename)
+        self.write_to_drive(merged_content, output_filename, output_folder_id)
         print("✅ Arquivo gravado com sucesso")
         
         print("\n" + "="*60)
@@ -267,13 +268,17 @@ def main():
     parser = argparse.ArgumentParser(description='Obsidian to NotebookLM Pipeline')
     parser.add_argument('--config', default='configuracoes_pipeline.txt', help='Caminho do arquivo de configuração')
     parser.add_argument('--folder-id', required=True, help='ID da pasta do Obsidian no Google Drive')
+    parser.add_argument('--output-folder-id', help='ID da pasta onde salvar o arquivo (padrão: mesma pasta do Obsidian)')
     parser.add_argument('--output', default='Obsidian_Master.txt', help='Nome do arquivo de saída')
     
     args = parser.parse_args()
     
+    # Se não especificado, usa a mesma pasta do Obsidian
+    output_folder = args.output_folder_id if args.output_folder_id else args.folder_id
+    
     # Executa pipeline
     pipeline = ObsidianNotebookLMPipeline(args.config)
-    pipeline.run_pipeline(args.folder_id, args.output)
+    pipeline.run_pipeline(args.folder_id, output_folder, args.output)
 
 
 if __name__ == "__main__":
