@@ -140,31 +140,7 @@ jobs:
           asyncio.run(sync())
           "
 
-      - name: Gerar Audio Overview (PT-BR)
-        id: gen_audio
-        if: steps.has_post.outputs.has_post == 'true' && steps.sync_nlm.conclusion == 'success'
-        continue-on-error: true
-        run: |
-          python -c "
-          import asyncio, os
-          async def gen():
-              from notebooklm import NotebookLMClient
-              auth = os.getenv('NOTEBOOKLM_AUTH_JSON')
-              if auth: os.environ['NOTEBOOKLM_AUTH_JSON'] = auth
-              async with NotebookLMClient.from_storage() as client:
-                  nb_id = os.getenv('NOTEBOOKLM_NOTEBOOK_ID')
-                  print('Gerando Audio Overview em Portugues...')
-                  status = await client.artifacts.generate_audio(
-                      nb_id,
-                      instructions='Gere um audio em portugues brasileiro, tom didatico e envolvente, resumindo os principais pontos do post.'
-                  )
-                  print(f'Audio iniciado: {status.task_id}')
-                   await client.artifacts.wait_for_completion(nb_id, status.task_id, timeout=600)
-                   print('Audio Overview gerado com sucesso!')
-          asyncio.run(gen())
-          "
-
-      - name: Gerar Video Overview (16:9, PT-BR, estilo personalizado)
+      - name: Gerar Video Overview (9:16, PT-BR, estilo personalizado)
         id: gen_video
         if: steps.has_post.outputs.has_post == 'true' && steps.sync_nlm.conclusion == 'success'
         continue-on-error: true
@@ -182,7 +158,7 @@ jobs:
                       nb_id,
                       instructions=(
                           'Idioma: portugues brasileiro. '
-                          'Formato: 16:9 horizontal. '
+                           'Formato: 9:16 horizontal. '
                           'Estilo visual personalizado: cenario tecnologico moderno com fundo limpo, '
                           'paleta de cores verde (#28a745) e azul (#2196f3), '
                           'animacoes suaves de transicao, graficos explicativos simples. '
@@ -205,7 +181,7 @@ jobs:
         id: download_media
         if: >
           steps.has_post.outputs.has_post == 'true' &&
-          (steps.gen_audio.conclusion == 'success' || steps.gen_video.conclusion == 'success')
+          steps.gen_video.conclusion == 'success'
         continue-on-error: true
         run: |
           python -c "
@@ -237,17 +213,18 @@ jobs:
                   drive = build('drive', 'v3', credentials=creds)
                   folder_id = os.getenv('NOTEBOOKLM_OUTPUTS_FOLDER_ID')
 
+                  from notebooklm.types import ArtifactType
+
                   title = '${{ steps.post_data.outputs.post_title }}'
                   saved = []
                   for art in artifacts:
-                      art_title = art.title
-                      art_id = art.id
-                      ext = '.mp4' if art.kind == 'video' else '.wav'
-                      fname = f\"{title}{ext}\"
+                      if not art.is_completed or art.kind != ArtifactType.VIDEO:
+                          continue
+                      fname = f\"{title}.mp4\"
                       fname = fname.replace('/', '_').replace(':', '_')
                       temp = f'/tmp/{fname}'
                       try:
-                          await client.artifacts.download(nb_id, art_id, temp)
+                          await client.artifacts.download_video(nb_id, temp, artifact_id=art.id)
                           if os.path.exists(temp):
                               size = os.path.getsize(temp)
                               meta = {'name': fname, 'parents': [folder_id]}
@@ -257,7 +234,7 @@ jobs:
                               saved.append({'drive_id': f['id'], 'name': f['name'], 'path': temp})
                               os.remove(temp)
                       except Exception as e:
-                          print(f'Erro artifact {art_title}: {e}')
+                          print(f'Erro artifact {art.title}: {e}')
 
                   json.dump(saved, open('/tmp/saved_media.json','w'))
                   print(f'Total salvos: {len(saved)}')
@@ -395,9 +372,8 @@ jobs:
           echo "| Etapa | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Post ID | ${{ steps.post_data.outputs.post_id || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Sync NotebookLM | ${{ steps.sync_nlm.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Audio Overview | ${{ steps.gen_audio.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Video Overview | ${{ steps.gen_video.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+           echo "| Sync NotebookLM | ${{ steps.sync_nlm.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
+           echo "| Video Overview (9:16) | ${{ steps.gen_video.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Download/Drive | ${{ steps.download_media.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| YouTube Upload | ${{ steps.youtube.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Replace Video ID | ${{ steps.replace_video.outcome || 'pulado' }} |" >> $GITHUB_STEP_SUMMARY
