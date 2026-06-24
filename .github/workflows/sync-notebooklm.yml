@@ -97,7 +97,7 @@ jobs:
 
       - name: Gerar Audio Overview
         id: gen_audio
-        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome != 'failure'
+        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.conclusion == 'success'
         continue-on-error: true
         run: |
           python scripts/save_notebooklm_video.py generate-audio \
@@ -105,7 +105,7 @@ jobs:
 
       - name: Gerar Video Overview
         id: gen_video
-        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome != 'failure'
+        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.conclusion == 'success'
         continue-on-error: true
         run: |
           python scripts/save_notebooklm_video.py generate-video \
@@ -184,7 +184,7 @@ jobs:
           fi
 
       - name: Salvar estado da sincronizacao
-        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome == 'success'
+        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.conclusion == 'success'
         uses: actions/cache/save@v4
         with:
           path: .last_sync.json
