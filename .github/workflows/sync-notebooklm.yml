@@ -15,7 +15,7 @@ on:
         type: boolean
 
 concurrency:
-  group: obsidian-pipeline
+  group: obsidian-sync
   cancel-in-progress: false
 
 jobs:
