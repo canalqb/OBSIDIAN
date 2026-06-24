@@ -49,28 +49,48 @@ class ObsidianNotebookLMPipeline:
         """Configura autenticação dual (Service Account + OAuth)"""
         # Service Account para leitura
         try:
-            self.service_account_creds = service_account.Credentials.from_service_account_file(
-                'service_account.json',
-                scopes=['https://www.googleapis.com/auth/drive.readonly']
-            )
-            print("✅ Service Account configurado para leitura")
+            if os.path.exists('service_account.json'):
+                self.service_account_creds = service_account.Credentials.from_service_account_file(
+                    'service_account.json',
+                    scopes=['https://www.googleapis.com/auth/drive.readonly']
+                )
+                print("✅ Service Account configurado para leitura")
+            else:
+                print("⚠️ Arquivo service_account.json não encontrado, usando OAuth para tudo")
+                self.service_account_creds = None
         except Exception as e:
             print(f"⚠️ Erro ao configurar Service Account: {e}")
+            self.service_account_creds = None
         
-        # OAuth para gravação
+        # OAuth para gravação (e leitura como fallback)
         try:
-            if os.path.exists('token.json'):
-                self.oauth_creds = credentials.Credentials.from_authorized_user_file(
-                    'token.json',
+            client_id = os.getenv('GOOGLE_CLIENT_ID')
+            client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+            refresh_token = os.getenv('GOOGLE_REFRESH_TOKEN')
+            
+            if all([client_id, client_secret, refresh_token]):
+                self.oauth_creds = credentials.Credentials(
+                    token=None,
+                    refresh_token=refresh_token,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=client_id,
+                    client_secret=client_secret,
                     scopes=['https://www.googleapis.com/auth/drive']
                 )
+                # Renova token
+                from google.auth.transport.requests import Request
+                self.oauth_creds.refresh(Request())
                 print("✅ OAuth configurado para gravação")
+            else:
+                print("⚠️ Variáveis OAuth não configuradas")
+                self.oauth_creds = None
         except Exception as e:
             print(f"⚠️ Erro ao configurar OAuth: {e}")
+            self.oauth_creds = None
     
     def read_obsidian_notes(self, folder_id=None):
         """
-        Lê notas do Obsidian usando Service Account
+        Lê notas do Obsidian usando Service Account ou OAuth
         
         Args:
             folder_id: ID da pasta no Google Drive
@@ -78,10 +98,13 @@ class ObsidianNotebookLMPipeline:
         Returns:
             Lista de notas com conteúdo
         """
-        if not self.service_account_creds:
-            raise Exception("Service Account não configurado")
+        # Usa Service Account se disponível, senão OAuth
+        creds = self.service_account_creds if self.service_account_creds else self.oauth_creds
         
-        drive_service = build('drive', 'v3', credentials=self.service_account_creds)
+        if not creds:
+            raise Exception("Nenhuma credencial configurada")
+        
+        drive_service = build('drive', 'v3', credentials=creds)
         
         query = ""
         if folder_id:
@@ -175,15 +198,16 @@ class ObsidianNotebookLMPipeline:
         if folder_id:
             file_metadata['parents'] = [folder_id]
         
-        media = MediaFileUpload(
-            f'temp_{filename}',
+        # Usa MediaIoBaseUpload para upload direto de bytes
+        from googleapiclient.http import MediaIoBaseUpload
+        import io
+        
+        fh = io.BytesIO(content.encode('utf-8'))
+        media = MediaIoBaseUpload(
+            fh,
             mimetype='text/plain',
             resumable=True
         )
-        
-        # Salva conteúdo temporário
-        with open(f'temp_{filename}', 'w', encoding='utf-8') as f:
-            f.write(content)
         
         if existing_files:
             # Atualiza arquivo existente
@@ -191,7 +215,7 @@ class ObsidianNotebookLMPipeline:
             file = drive_service.files().update(
                 fileId=file_id,
                 media_body=media,
-                fields={'id'}
+                fields='id'
             ).execute()
             print(f"✅ Arquivo atualizado: {filename}")
         else:
@@ -199,12 +223,9 @@ class ObsidianNotebookLMPipeline:
             file = drive_service.files().create(
                 body=file_metadata,
                 media_body=media,
-                fields={'id'}
+                fields='id'
             ).execute()
             print(f"✅ Arquivo criado: {filename}")
-        
-        # Remove arquivo temporário
-        os.remove(f'temp_{filename}')
         
         return file
     
