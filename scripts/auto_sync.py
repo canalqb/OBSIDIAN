@@ -4,11 +4,11 @@ Cria/atualiza arquivo e fornece instruções para NotebookLM
 """
 
 import os
-from obsidian_to_notebooklm import ObsidianNotebookLMPipeline
+from merge_notes import merge_obsidian_notes
 
 def auto_sync(obsidian_folder_id, notebook_id=None):
     """
-    Sincronização automática completa
+    Sincronização automática completa usando Python (sem Apps Script)
     
     Args:
         obsidian_folder_id: ID da pasta do Obsidian no Drive
@@ -18,9 +18,13 @@ def auto_sync(obsidian_folder_id, notebook_id=None):
     print("🔄 SINCRONIZAÇÃO AUTOMÁTICA OBSIDIAN → NOTEBOOKLM")
     print("="*70)
     
-    # Executa pipeline
-    pipeline = ObsidianNotebookLMPipeline('configuracoes_pipeline.txt')
-    pipeline.run_pipeline(obsidian_folder_id, obsidian_folder_id, 'Obsidian_Master.txt')
+    # Executa mesclagem via Python (substitui Apps Script)
+    print("\n📝 Usando script Python para mesclagem (sem Apps Script)")
+    success = merge_obsidian_notes(obsidian_folder_id, 'Obsidian_Master.txt')
+    
+    if not success:
+        print("\n❌ Falha na mesclagem das notas")
+        return False
     
     print("\n" + "="*70)
     print("📋 PRÓXIMOS PASSOS MANUAIS (NOTEBOOKLM SEM API)")
@@ -42,6 +46,8 @@ def auto_sync(obsidian_folder_id, notebook_id=None):
     
     print("\n💡 DICA: Use a extensão NotebookLM Tools (Chrome) para atualizar automaticamente")
     print("="*70)
+    
+    return True
 
 if __name__ == "__main__":
     import argparse
@@ -55,4 +61,8 @@ if __name__ == "__main__":
     # Usa notebook ID do config se não especificado
     notebook_id = args.notebook_id if args.notebook_id else "999a0463-0274-49fe-8fb7-f242338f4a2d"
     
-    auto_sync(args.folder_id, notebook_id)
+    success = auto_sync(args.folder_id, notebook_id)
+    
+    if not success:
+        import sys
+        sys.exit(1)
