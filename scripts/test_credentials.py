@@ -15,7 +15,27 @@ def test_service_account():
     print("🔐 TESTANDO SERVICE ACCOUNT")
     print("="*70)
     
-    # Verifica variáveis de ambiente
+    # Tenta usar arquivo JSON primeiro (mais confiável)
+    if os.path.exists('service_account_test.json'):
+        print("📁 Usando arquivo JSON: service_account_test.json")
+        try:
+            creds = service_account.Credentials.from_service_account_file(
+                'service_account_test.json',
+                scopes=['https://www.googleapis.com/auth/drive.readonly']
+            )
+            
+            # Testa conexão com Drive API
+            drive_service = build('drive', 'v3', credentials=creds)
+            about = drive_service.about().get(fields='user').execute()
+            
+            print(f"\n✅ Service Account autenticado com sucesso (via arquivo JSON)")
+            print(f"   Usuário: {about.get('user', {}).get('displayName', 'N/A')}")
+            return True
+        except Exception as e:
+            print(f"\n❌ Erro com arquivo JSON: {e}")
+    
+    # Fallback para variáveis de ambiente
+    print("📋 Tentando via variáveis de ambiente...")
     project_id = os.getenv('GOOGLE_PROJECT_ID')
     private_key_id = os.getenv('GOOGLE_PRIVATE_KEY_ID')
     private_key = os.getenv('GOOGLE_PRIVATE_KEY')
@@ -31,6 +51,9 @@ def test_service_account():
         return False
     
     try:
+        # Corrige aspas duplas se presentes (comum em cópias do Google Cloud Console)
+        private_key = private_key.replace('""', '"')
+        
         # Cria credenciais
         service_account_info = {
             "type": "service_account",
@@ -50,7 +73,7 @@ def test_service_account():
         drive_service = build('drive', 'v3', credentials=creds)
         about = drive_service.about().get(fields='user').execute()
         
-        print(f"\n✅ Service Account autenticado com sucesso")
+        print(f"\n✅ Service Account autenticado com sucesso (via variáveis de ambiente)")
         print(f"   Usuário: {about.get('user', {}).get('displayName', 'N/A')}")
         return True
         
@@ -126,6 +149,8 @@ def test_blogger_api():
         
     except Exception as e:
         print(f"\n❌ Erro ao conectar Blogger API: {e}")
+        print("💡 NOTA: Este teste usa API Key que pode não ter permissão para acessar blogs.")
+        print("💡 Para editar posts, use OAuth (como em blogger_update.py) que tem permissões completas.")
         return False
 
 
