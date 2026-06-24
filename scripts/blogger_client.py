@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, List
+from typing import Any, Optional, List
 from dotenv import load_dotenv
 from google.oauth2 import credentials as google_credentials
 from googleapiclient.discovery import build
@@ -104,6 +104,24 @@ class BloggerClient:
             body=existing,
         ).execute()
         return updated
+
+    def list_posts(self, blog_id: str, max_results: int = 500) -> List[dict]:
+        posts = []
+        page_token = None
+        while True:
+            response = self.service.posts().list(
+                blogId=blog_id,
+                maxResults=min(max_results - len(posts), 50),
+                pageToken=page_token,
+                view='ADMIN',
+                fetchBodies=False,
+                orderBy='UPDATED',
+            ).execute()
+            posts.extend(response.get('items', []))
+            page_token = response.get('nextPageToken')
+            if not page_token or len(posts) >= max_results:
+                break
+        return posts
 
     def get_post(self, blog_id: str, post_id: str) -> dict:
         return self.service.posts().get(
