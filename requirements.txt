@@ -5,6 +5,7 @@ google-auth>=2.23.0
 
 # HTTP e utilitarios
 requests>=2.31.0
+python-dotenv>=1.0.0
 
 # API REST local (opcional — so necessario para obsidian_api.py)
 flask>=2.3.0
