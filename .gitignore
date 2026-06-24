@@ -9,6 +9,9 @@ configuracoes_pipeline.txt
 *_private.txt
 credentials.json
 token.json
+service_account.json
+client_config.json
+temp_*.txt
 
 # Google Apps Script (se houver arquivos locais)
 .clasp.json
