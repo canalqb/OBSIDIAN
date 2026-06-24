@@ -31,6 +31,7 @@ jobs:
       OBSIDIAN_VAULT_FOLDER_ID: ${{ secrets.OBSIDIAN_VAULT_FOLDER_ID }}
       NOTEBOOKLM_NOTEBOOK_ID:  ${{ secrets.NOTEBOOKLM_NOTEBOOK_ID }}
       NOTEBOOKLM_OUTPUTS_FOLDER_ID: ${{ secrets.NOTEBOOKLM_OUTPUTS_FOLDER_ID }}
+      NOTEBOOKLM_AUTH_JSON:  ${{ secrets.NOTEBOOKLM_AUTH_JSON }}
       BLOGGER_BLOG_ID: "5982274115355506187"
       PYTHONPATH: ${{ github.workspace }}/scripts
 
@@ -96,7 +97,7 @@ jobs:
 
       - name: Gerar Audio Overview
         id: gen_audio
-        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome == 'success'
+        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome != 'failure'
         continue-on-error: true
         run: |
           python scripts/save_notebooklm_video.py generate-audio \
@@ -104,7 +105,7 @@ jobs:
 
       - name: Gerar Video Overview
         id: gen_video
-        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome == 'success'
+        if: steps.check.outputs.has_changes == 'true' && steps.sync_nlm.outcome != 'failure'
         continue-on-error: true
         run: |
           python scripts/save_notebooklm_video.py generate-video \
