@@ -159,8 +159,8 @@ jobs:
                       instructions='Gere um audio em portugues brasileiro, tom didatico e envolvente, resumindo os principais pontos do post.'
                   )
                   print(f'Audio iniciado: {status.task_id}')
-                  await client.artifacts.wait_for_completion(nb_id, status.task_id)
-                  print('Audio Overview gerado com sucesso!')
+                   await client.artifacts.wait_for_completion(nb_id, status.task_id, timeout=600)
+                   print('Audio Overview gerado com sucesso!')
           asyncio.run(gen())
           "
 
@@ -196,7 +196,7 @@ jobs:
                       )
                   )
                   print(f'Video iniciado: {status.task_id}')
-                  await client.artifacts.wait_for_completion(nb_id, status.task_id)
+                  await client.artifacts.wait_for_completion(nb_id, status.task_id, timeout=600)
                   print('Video Overview gerado com sucesso!')
           asyncio.run(gen())
           "
@@ -240,9 +240,9 @@ jobs:
                   title = '${{ steps.post_data.outputs.post_title }}'
                   saved = []
                   for art in artifacts:
-                      art_title = art.get('title', 'artifact')
-                      art_id = art['id']
-                      ext = '.mp4' if art.get('mimeType', '').startswith('video') else '.wav'
+                      art_title = art.title
+                      art_id = art.id
+                      ext = '.mp4' if art.kind == 'video' else '.wav'
                       fname = f\"{title}{ext}\"
                       fname = fname.replace('/', '_').replace(':', '_')
                       temp = f'/tmp/{fname}'
