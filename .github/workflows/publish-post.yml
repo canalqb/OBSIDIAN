@@ -55,7 +55,7 @@ jobs:
           pip install -r requirements.txt
           echo "Dependencias instaladas"
 
-      - name: "Step 1/4 — Sincronizar com NotebookLM"
+      - name: "Step 1/5 — Sincronizar com NotebookLM"
         id: sync_nlm
         continue-on-error: true
         run: |
@@ -63,7 +63,7 @@ jobs:
           python scripts/sync_to_notebooklm.py \
             --notebook-id "$NOTEBOOKLM_NOTEBOOK_ID"
 
-      - name: "Step 2/4 — Gerar Audio Overview"
+      - name: "Step 2/5 — Gerar Audio Overview"
         id: gen_audio
         if: steps.sync_nlm.outcome == 'success'
         continue-on-error: true
@@ -72,7 +72,7 @@ jobs:
           python scripts/save_notebooklm_video.py generate-audio \
             "Resuma os principais topicos de forma clara e envolvente"
 
-      - name: "Step 3/4 — Gerar Video Overview"
+      - name: "Step 3/5 — Gerar Video Overview"
         id: gen_video
         if: steps.sync_nlm.outcome == 'success'
         continue-on-error: true
@@ -81,7 +81,7 @@ jobs:
           python scripts/save_notebooklm_video.py generate-video \
             "Crie um video resumindo os principais insights das fontes"
 
-      - name: "Step 4/4 — Baixar e salvar no Drive"
+      - name: "Step 4/5 — Baixar media do NotebookLM para o Drive"
         id: download_media
         if: steps.sync_nlm.outcome == 'success'
         continue-on-error: true
@@ -89,21 +89,76 @@ jobs:
           echo "Baixando media para o Drive..."
           python scripts/save_notebooklm_video.py download
 
-      - name: Resumo da etapa NotebookLM
+      - name: "Step 5/5 — Upload YouTube e atualizar post"
+        id: youtube_upload
+        if: steps.sync_nlm.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "Procurando video no Drive..."
+          python -c "
+from drive_client import DriveClient
+import os, json, sys
+dc = DriveClient()
+folder_id = os.getenv('NOTEBOOKLM_OUTPUTS_FOLDER_ID', '1Eikf5MOwCNopr-FS976lheYlUprvWEx-')
+files = dc.list_files(folder_id)
+videos = [f for f in files if f['name'].endswith(('.mp4', '.webm', '.mov'))]
+if not videos:
+    print('Nenhum video encontrado no Drive')
+    sys.exit(1)
+latest = max(videos, key=lambda f: f.get('modifiedTime', ''))
+print(f'Video encontrado: {latest[\"name\"]} (ID: {latest[\"id\"]})')
+raw = dc.service.files().get_media(fileId=latest['id']).execute()
+with open('/tmp/video_notebooklm.mp4', 'wb') as fp:
+    fp.write(raw)
+print('Video baixado para /tmp/video_notebooklm.mp4')
+with open('/tmp/video_info.json', 'w') as fp:
+    json.dump({'file_id': latest['id'], 'name': latest['name']}, fp)
+" 2>&1
+          if [ -f /tmp/video_notebooklm.mp4 ]; then
+            echo "Enviando video para YouTube (privado)..."
+            python scripts/youtube_uploader.py \
+              --file /tmp/video_notebooklm.mp4 \
+              --title "${{ inputs.video_title }}" \
+              --description "Video gerado automaticamente pelo NotebookLM para o post no @CanalQb" \
+              --tags "@CanalQb,automacao,NotebookLM" \
+              --privacy "private" 2>&1 | tee /tmp/youtube_result.txt
+            VIDEO_ID=$(grep -oP '"video_id": "\K[^"]+' /tmp/youtube_result.txt || echo "")
+            if [ -n "$VIDEO_ID" ]; then
+              echo "VIDEO_ID=$VIDEO_ID" >> $GITHUB_ENV
+              echo "Atualizando post do Blogger com embed do YouTube..."
+              python -c "
+from blogger_client import BloggerClient
+bc = BloggerClient()
+result = bc.add_youtube_embed(
+    blog_id='${{ env.BLOGGER_BLOG_ID }}',
+    post_id='${{ inputs.post_id }}',
+    video_id='$VIDEO_ID',
+    video_title='${{ inputs.video_title }}',
+)
+print(f'Post atualizado: {result.get(\"url\", \"\")}')
+"
+            fi
+          else
+            echo "Nenhum video para fazer upload"
+          fi
+
+      - name: Resumo final
         if: always()
         run: |
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Resultado NotebookLM" >> $GITHUB_STEP_SUMMARY
+          echo "## Pipeline Completo — ${{ inputs.video_title }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Etapa | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Sync NotebookLM | ${{ steps.sync_nlm.outcome }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Gerar Audio | ${{ steps.gen_audio.outcome }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Gerar Video | ${{ steps.gen_video.outcome }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Download Media | ${{ steps.download_media.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| YouTube Upload | ${{ steps.youtube_upload.outcome }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Post ID:** ${{ inputs.post_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Video:** ${{ inputs.video_title }}" >> $GITHUB_STEP_SUMMARY
-          
+          echo "**Video ID:** ${{ env.VIDEO_ID }}" >> $GITHUB_STEP_SUMMARY
+
       - name: Notificar falha
         if: failure()
         run: |
@@ -112,4 +167,4 @@ jobs:
           echo "**Acao recomendada:**" >> $GITHUB_STEP_SUMMARY
           echo "1. Verifique os logs acima" >> $GITHUB_STEP_SUMMARY
           echo "2. Execute manualmente no NotebookLM" >> $GITHUB_STEP_SUMMARY
-          echo "3. Apos gerar o video, rode youtube_uploader.py manualmente" >> $GITHUB_STEP_SUMMARY
+          echo "3. Se o video foi gerado no Drive, rode youtube_uploader.py manualmente" >> $GITHUB_STEP_SUMMARY
