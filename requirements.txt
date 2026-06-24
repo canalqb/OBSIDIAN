@@ -5,3 +5,4 @@ google-auth>=2.23.0
 
 # Additional dependencies
 requests>=2.31.0
+flask>=2.3.0
