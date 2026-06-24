@@ -47,7 +47,7 @@ def main():
 
     bc = BloggerClient()
     print(f"Buscando posts do blog {BLOG_ID}...")
-    posts = bc.list_posts(BLOG_ID, max_results=500)
+    posts = bc.list_posts(BLOG_ID, max_results=5000)
     print(f"Total de posts encontrados: {len(posts)}")
 
     sc = SheetsClient()

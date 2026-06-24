@@ -105,7 +105,7 @@ class BloggerClient:
         ).execute()
         return updated
 
-    def list_posts(self, blog_id: str, max_results: int = 500) -> List[dict]:
+    def list_posts(self, blog_id: str, max_results: int = 5000) -> List[dict]:
         posts = []
         page_token = None
         while True:
