@@ -1,0 +1,181 @@
+================================================================================
+CONFIGURAÇÕES PIPELINE: CLAUDE CODE + NOTEBOOKLM + OBSIDIAN
+================================================================================
+Documento de configuração para automação de pesquisa com IA
+Baseado em: https://www.canalqb.com.br/2026/06/seo-claude-code-notebooklm-obsidian.html
+
+================================================================================
+CAMINHO GRATUITO: GOOGLE APPS SCRIPT + NOTEBOOKLM TOOLS
+================================================================================
+
+--- VARIÁVEIS DO GOOGLE DRIVE ---
+ID_DA_PASTA_OBSIDIAN: [Cole o ID da pasta do seu vault no Google Drive]
+  - Como obter: Abra a pasta no Google Drive, copie o ID da URL
+  - Exemplo: https://drive.google.com/drive/folders/XXXXXXXXXXXXXXXXXXXXXXX
+  - O ID é a parte após /folders/
+
+NOME_ARQUIVO_SAIDA: Obsidian_Master.txt
+  - Nome do arquivo .txt que será gerado com todas as notas mescladas
+
+--- VARIÁVEIS DO GOOGLE APPS SCRIPT ---
+URL_SCRIPT: https://script.google.com
+  - Acesse este URL para criar o script de mesclagem
+
+FUNCAO_TRIGGER: mesclarObsidianParaTxt
+  - Nome da função que será executada automaticamente
+
+FREQUENCIA_TRIGGER: [1 hora | Alteração de arquivo]
+  - Configure no Apps Script (ícone de relógio)
+
+--- VARIÁVEIS DO NOTEBOOKLM ---
+URL_NOTEBOOKLM: https://notebooklm.google.com
+  - Acesse este URL para criar o notebook
+
+NOME_NOTEBOOK: [Digite o nome do seu notebook]
+  - Exemplo: Pesquisa Obsidian
+
+EXTENSAO_CHROME: NotebookLM Tools
+  - Instale na Chrome Web Store
+  - URL: [Pesquise "NotebookLM Tools" na Chrome Web Store]
+
+--- LIMITE DE NOTAS ---
+MAXIMO_NOTAS: 400
+  - Limite validado pelo CanalQb para este método
+  - Se ultrapassar, divida em múltiplos arquivos por pasta temática
+
+MAXIMO_PALAVRAS: 500.000
+  - Limite do NotebookLM por fonte
+
+
+================================================================================
+CAMINHO PAGO: CLAUDE CODE + MCP NATIVO
+================================================================================
+
+--- VARIÁVEIS DE INSTALAÇÃO ---
+GERENCIADOR_PYTHON: uv
+  - Comando de instalação: [Ver documentação oficial do uv]
+
+CLAUDE_CODE_CLI: [Instale via documentação oficial]
+  - Ferramenta de linha de comando do Claude
+
+--- VARIÁVEIS DO ARQUIVO DE CONFIGURAÇÃO ---
+CAMINHO_CONFIG: ~/.claude/claude_desktop_config.json
+  - Localização do arquivo de configuração (Linux/Mac)
+  - Windows: %APPDATA%\Claude\claude_desktop_config.json
+
+SERVIDOR_MCP: notebooklm-mcp-server
+  - Nome do servidor MCP para NotebookLM
+
+COMANDO_MCP: notebooklm-mcp-server
+  - Comando para iniciar o servidor MCP
+
+--- CONTEÚDO DO claude_desktop_config.json ---
+{
+  "mcpServers": {
+    "notebooklm": {
+      "command": "notebooklm-mcp-server",
+      "args": []
+    }
+  }
+}
+
+--- VARIÁVEIS DA SKILL CLAUDE CODE ---
+CAMINHO_SKILL: ~/vault/.claude/CLAUDE.md
+  - Localização do arquivo de skill no seu vault
+  - Windows: C:\Users\[SeuUsuario]\vault\.claude\CLAUDE.md
+
+DIRETORIO_RESEARCH: ~/vault/research/
+  - Diretório onde as notas de pesquisa serão salvas
+  - Windows: C:\Users\[SeuUsuario]\vault\research\
+
+FORMATO_DATA: YYYY-MM-DD
+  - Formato da data no nome do arquivo
+
+FORMATO_NOME_ARQUIVO: YYYY-MM-DD-{tema}.md
+  - Padrão de nomeação dos arquivos de pesquisa
+
+--- ESTRUTURA DA NOTA NO OBSIDIAN ---
+FRONTMATTER:
+---
+tags: [pesquisa, notebooklm]
+data: YYYY-MM-DD
+fontes: []
+status: rascunho
+---
+
+SEÇÕES OBRIGATÓRIAS:
+- ## Conceitos-chave
+- ## Pontos de atenção
+- ## Fontes citadas (com links)
+- ## Perguntas para aprofundar
+
+LINKS INTERNOS: [[nota-existente]]
+  - Formato para links bidirecionais no Obsidian
+
+--- COMANDO DE EXECUÇÃO ---
+notebooklm ask --new --json "Quais são os pontos centrais sobre {tema}?"
+  - Substitua {tema} pelo tema da sua pesquisa
+
+
+================================================================================
+VARIÁVEIS GERAIS (AMBOS OS CAMINHOS)
+================================================================================
+
+--- CAMINHO DO VAULT OBSIDIAN ---
+CAMINHO_VAULT_LOCAL: [Caminho completo para o seu vault]
+  - Exemplo Windows: C:\Users\Qb\Desktop\obsidian
+  - Exemplo Linux/Mac: ~/Documents/ObsidianVault
+
+CAMINHO_VAULT_DRIVE: [Caminho no Google Drive se sincronizado]
+  - Exemplo: /Meu Drive/ObsidianVault
+
+--- TIPOS DE ARQUIVO ---
+EXTENSAO_NOTAS: .md
+  - Extensão dos arquivos do Obsidian
+
+EXTENSAO_EXPORTACAO: .txt
+  - Extensão para exportação ao NotebookLM
+
+
+================================================================================
+CREDENCIAIS E TOKENS (SE NECESSÁRIO)
+================================================================================
+
+--- GOOGLE ACCOUNT ---
+EMAIL_GOOGLE: [seu.email@gmail.com]
+  - Conta Google com acesso ao NotebookLM e Google Drive
+
+--- ANTHROPIC (CLAUDE) ---
+API_KEY_ANTHROPIC: [sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]
+  - Token da API da Anthropic (se necessário para recursos avançados)
+  - Obtenha em: https://console.anthropic.com/
+
+--- NOTEBOOKLM API (SE DISPONÍVEL) ---
+API_KEY_NOTEBOOKLM: [Token se API estiver disponível]
+  - Atualmente o NotebookLM não possui API pública
+  - Esta seção é para uso futuro se a API for lançada
+
+
+================================================================================
+NOTAS E REFERÊNCIAS
+================================================================================
+
+- Artigo original: https://www.canalqb.com.br/2026/06/seo-claude-code-notebooklm-obsidian.html
+- Canal YouTube: CanalQb
+- Data de criação deste documento: 2026-06-24
+
+--- DICAS ---
+1. Para o caminho gratuito, certifique-se de que a pasta do Obsidian está sincronizada com o Google Drive
+2. Para o caminho pago, verifique se o uv está instalado corretamente antes de configurar o MCP
+3. Teste com um pequeno número de notas antes de processar o vault completo
+4. Faça backup do seu vault antes de qualquer automação
+
+--- STATUS DA CONFIGURAÇÃO ---
+[ ] Caminho Gratuito configurado
+[ ] Caminho Pago configurado
+[ ] Testes realizados
+[ ] Pipeline em produção
+
+================================================================================
+FIM DO DOCUMENTO DE CONFIGURAÇÃO
+================================================================================

@@ -1,0 +1,54 @@
+# Configurações pessoais (não commitar dados reais)
+config.txt
+configuracoes_pipeline.txt
+*.env
+.env
+
+# Dados sensíveis
+*_secret.txt
+*_private.txt
+credentials.json
+token.json
+
+# Google Apps Script (se houver arquivos locais)
+.clasp.json
+*.gsheet
+
+# Obsidian
+.obsidian/
+.vault/
+
+# Python (para caminho pago MCP)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Node.js (se usar)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Arquivos temporários
+*.tmp
+*.temp
