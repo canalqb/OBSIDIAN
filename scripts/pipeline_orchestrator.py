@@ -24,44 +24,6 @@ GITHUB_REPO = os.getenv("GITHUB_REPO_NAME", "OBSIDIAN")
 GITHUB_OWNER = os.getenv("GITHUB_REPO_OWNER", "canalqb")
 
 
-def trigger_github_workflow(post_id: str, video_title: str) -> dict:
-    """Dispara o workflow publish-post.yml via GitHub API."""
-    import requests
-
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        return {"success": False, "message": "GITHUB_TOKEN nao configurado"}
-
-    url = (f"https://api.github.com/repos/{GITHUB_OWNER}/"
-           f"{GITHUB_REPO}/actions/workflows/publish-post.yml/dispatches")
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-
-    payload = {
-        "ref": "main",
-        "inputs": {
-            "post_id": post_id,
-            "video_title": video_title,
-        },
-    }
-
-    resp = requests.post(url, headers=headers, json=payload, timeout=30)
-    if resp.status_code in (204, 200, 201):
-        print(f"Workflow publish-post.yml disparado para post_id={post_id}")
-        actions_url = (f"https://github.com/{GITHUB_OWNER}/"
-                       f"{GITHUB_REPO}/actions")
-        return {"success": True, "actions_url": actions_url}
-    else:
-        return {
-            "success": False,
-            "message": f"Erro HTTP {resp.status_code}: {resp.text[:200]}",
-        }
-
-
 def run_pipeline(
     html: str,
     title: str,
@@ -69,8 +31,10 @@ def run_pipeline(
     source: str = "opencode",
     dry_run: bool = False,
 ) -> dict:
-    """Fluxo local: Blogger -> GitHub -> trigger workflow.
-    NotebookLM -> YouTube -> update post roda no GitHub Actions.
+    """Fluxo local: Blogger -> GitHub.
+    O push no Obsidian_Master.txt dispara automaticamente o
+    sync-notebooklm.yml no GitHub Actions, que roda:
+      NotebookLM -> YouTube -> update post.
     """
 
     result = {
@@ -83,7 +47,7 @@ def run_pipeline(
 
     # === Step 1: Publicar no Blogger ===
     print(f"\n{'='*60}")
-    print(f"STEP 1/3: Publicando post no Blogger...")
+    print(f"STEP 1/2: Publicando post no Blogger...")
     print(f"{'='*60}")
 
     if dry_run:
@@ -109,7 +73,9 @@ def run_pipeline(
 
     # === Step 2: Enviar para Obsidian_Master.txt (GitHub) ===
     print(f"\n{'='*60}")
-    print(f"STEP 2/3: Enviando para Obsidian_Master.txt...")
+    print(f"STEP 2/2: Enviando para Obsidian_Master.txt...")
+    print(f"{'='*60}")
+    print(f"(O push dispara sync-notebooklm.yml no GitHub Actions)")
     print(f"{'='*60}")
 
     nlm_content = (
@@ -141,42 +107,22 @@ def run_pipeline(
             result["steps"]["github"] = f"error: {e}"
             print(f"Erro ao enviar para GitHub: {e}")
 
-    # === Step 3: Disparar workflow GitHub Actions ===
-    print(f"\n{'='*60}")
-    print(f"STEP 3/3: Disparando workflow GitHub Actions...")
-    print(f"{'='*60}")
-
-    if dry_run:
-        print(f"[DRY-RUN] Dispararia workflow com post_id={result['post_id']}")
-        result["steps"]["workflow"] = "dry_run"
-    else:
-        wf_result = trigger_github_workflow(
-            post_id=result["post_id"] or "",
-            video_title=title,
-        )
-        result["steps"]["workflow"] = "triggered" if wf_result.get("success") else wf_result.get("message")
-        result["actions_url"] = wf_result.get("actions_url")
-        if wf_result.get("success"):
-            print(f"Workflow disparado!")
-            print(f"Acompanhe: {wf_result.get('actions_url')}")
-            print(f"")
-            print(f"O workflow no GitHub Actions vai:")
-            print(f"  1. Sincronizar com NotebookLM")
-            print(f"  2. Gerar audio/video")
-            print(f"  3. Salvar no Google Drive")
-            print(f"  4. Fazer upload para YouTube (privado)")
-            print(f"  5. Atualizar o post com embed do video")
-        else:
-            print(f"Erro ao disparar workflow: {wf_result.get('message')}")
-
     result["success"] = True
 
     print(f"\n{'='*60}")
     print(f"ORQUESTRACAO LOCAL COMPLETA!")
     print(f"{'='*60}")
     print(f"  Post:  {result.get('post_url', 'N/A')}")
-    print(f"  GitHub: https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/actions")
-    print(f"  Proximos passos rodam no GitHub Actions (NotebookLM + YouTube)")
+    print(f"  GitHub: https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}")
+    print(f"")
+    print(f"O push no Obsidian_Master.txt ja disparou o workflow")
+    print(f"sync-notebooklm.yml no GitHub Actions, que vai:")
+    print(f"  1. Sincronizar com NotebookLM")
+    print(f"  2. Gerar audio/video")
+    print(f"  3. Fazer upload para YouTube (privado)")
+    print(f"  4. Atualizar o post com embed do video")
+    print(f"")
+    print(f"Acompanhe em: https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/actions")
 
     return result
 
