@@ -1,0 +1,13 @@
+name: Test Minimal Workflow
+
+on:
+  push:
+    paths:
+      - 'test-trigger.txt'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "OK"
