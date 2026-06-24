@@ -8,4 +8,4 @@ requests>=2.31.0
 flask>=2.3.0
 
 # NotebookLM (unofficial API)
-notebooklm-py>=0.1.0
+notebooklm-py>=0.4.0
