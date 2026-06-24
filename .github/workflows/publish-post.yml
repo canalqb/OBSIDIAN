@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       post_id:
-        description: "ID do post no Blogger"
+        description: ID do post no Blogger
         required: true
         type: string
       video_title:
-        description: "Titulo do video no YouTube"
+        description: Titulo do video no YouTube
         required: true
         type: string
       force_generate:
-        description: "Forcar geracao mesmo sem mudancas"
+        description: Forcar geracao mesmo sem mudancas
         required: false
         default: "false"
         type: boolean
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   publish:
-    name: "Publicar: ${{ inputs.video_title }}"
+    name: Publicar ${{ inputs.video_title }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -38,58 +38,50 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/scripts
 
     steps:
-      - name: Checkout repositorio
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
+          cache: pip
 
       - name: Instalar dependencias
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          echo "Dependencias instaladas"
 
-      - name: "Step 1/5 — Sincronizar com NotebookLM"
+      - name: Sync NotebookLM
         id: sync_nlm
         continue-on-error: true
         run: |
-          echo "Sincronizando com NotebookLM..."
-          python scripts/sync_to_notebooklm.py \
-            --notebook-id "$NOTEBOOKLM_NOTEBOOK_ID"
+          python scripts/sync_to_notebooklm.py --notebook-id "$NOTEBOOKLM_NOTEBOOK_ID"
 
-      - name: "Step 2/5 — Gerar Audio Overview"
+      - name: Gerar Audio Overview
         id: gen_audio
         if: steps.sync_nlm.outcome == 'success'
         continue-on-error: true
         run: |
-          echo "Gerando Audio Overview..."
           python scripts/save_notebooklm_video.py generate-audio \
             "Resuma os principais topicos de forma clara e envolvente"
 
-      - name: "Step 3/5 — Gerar Video Overview"
+      - name: Gerar Video Overview
         id: gen_video
         if: steps.sync_nlm.outcome == 'success'
         continue-on-error: true
         run: |
-          echo "Gerando Video Overview..."
           python scripts/save_notebooklm_video.py generate-video \
             "Crie um video resumindo os principais insights das fontes"
 
-      - name: "Step 4/5 — Baixar media do NotebookLM para o Drive"
+      - name: Baixar media no Drive
         id: download_media
         if: steps.sync_nlm.outcome == 'success'
         continue-on-error: true
         run: |
-          echo "Baixando media para o Drive..."
           python scripts/save_notebooklm_video.py download
 
-      - name: "Step 5/5 — Upload YouTube e atualizar post"
+      - name: Upload YouTube + Update Blogger
         id: youtube_upload
         if: steps.sync_nlm.outcome == 'success'
         continue-on-error: true
@@ -106,7 +98,7 @@ if not videos:
     print('Nenhum video encontrado no Drive')
     sys.exit(1)
 latest = max(videos, key=lambda f: f.get('modifiedTime', ''))
-print(f'Video encontrado: {latest[\"name\"]} (ID: {latest[\"id\"]})')
+print('Video encontrado:', latest['name'], '(ID:', latest['id'], ')')
 raw = dc.service.files().get_media(fileId=latest['id']).execute()
 with open('/tmp/video_notebooklm.mp4', 'wb') as fp:
     fp.write(raw)
@@ -130,12 +122,12 @@ with open('/tmp/video_info.json', 'w') as fp:
 from blogger_client import BloggerClient
 bc = BloggerClient()
 result = bc.add_youtube_embed(
-    blog_id='${{ env.BLOGGER_BLOG_ID }}',
+    blog_id='5982274115355506187',
     post_id='${{ inputs.post_id }}',
     video_id='$VIDEO_ID',
     video_title='${{ inputs.video_title }}',
 )
-print(f'Post atualizado: {result.get(\"url\", \"\")}')
+print('Post atualizado:', result.get('url', ''))
 "
             fi
           else
@@ -146,7 +138,7 @@ print(f'Post atualizado: {result.get(\"url\", \"\")}')
         if: always()
         run: |
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Pipeline Completo — ${{ inputs.video_title }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Pipeline Completo" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Etapa | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
@@ -156,15 +148,15 @@ print(f'Post atualizado: {result.get(\"url\", \"\")}')
           echo "| Download Media | ${{ steps.download_media.outcome }} |" >> $GITHUB_STEP_SUMMARY
           echo "| YouTube Upload | ${{ steps.youtube_upload.outcome }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Post ID:** ${{ inputs.post_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Video ID:** ${{ env.VIDEO_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "Post ID: ${{ inputs.post_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "Video ID: ${{ env.VIDEO_ID }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notificar falha
         if: failure()
         run: |
           echo "Pipeline falhou!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Acao recomendada:**" >> $GITHUB_STEP_SUMMARY
+          echo "Acao recomendada:" >> $GITHUB_STEP_SUMMARY
           echo "1. Verifique os logs acima" >> $GITHUB_STEP_SUMMARY
           echo "2. Execute manualmente no NotebookLM" >> $GITHUB_STEP_SUMMARY
           echo "3. Se o video foi gerado no Drive, rode youtube_uploader.py manualmente" >> $GITHUB_STEP_SUMMARY
