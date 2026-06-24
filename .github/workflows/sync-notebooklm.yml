@@ -50,6 +50,15 @@ jobs:
           OBSIDIAN_VAULT_FOLDER_ID: ${{ secrets.OBSIDIAN_VAULT_FOLDER_ID }}
         run: python scripts/save_notebooklm_outputs.py --folder-id $OBSIDIAN_VAULT_FOLDER_ID
       
+      - name: Generate NotebookLM video overview
+        if: steps.check_changes.outputs.has_changes == 'true'
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          NOTEBOOKLM_NOTEBOOK_ID: ${{ secrets.NOTEBOOKLM_NOTEBOOK_ID }}
+        run: python scripts/save_notebooklm_video.py generate-video "Resuma os principais pontos das fontes"
+      
       - name: Save NotebookLM videos/audio to Drive
         if: steps.check_changes.outputs.has_changes == 'true'
         env:
