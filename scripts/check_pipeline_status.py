@@ -1,4 +1,4 @@
-﻿"""
+"""
 check_pipeline_status.py — Verifica status do pipeline e
 lista os ultimos videos gerados pelo NotebookLM salvos no Drive.
 """

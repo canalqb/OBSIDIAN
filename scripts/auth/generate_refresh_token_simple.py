@@ -1,4 +1,4 @@
-﻿"""
+"""
 Gerador simplificado de Refresh Token Google OAuth 2.0
 (versao sem emojis para compatibilidade Windows)
 """
