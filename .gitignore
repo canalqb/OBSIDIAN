@@ -1,65 +1,253 @@
-# Configurações pessoais (não commitar dados reais)
+# ============================================================
+# .gitignore - Obsidian Pipeline
+# ============================================================
+
+# --- Configurações pessoais (NUNCA commitar dados reais) ---
 config.txt
 configuracoes_pipeline.txt
 *.env
 .env
+.env.local
+.env.*.local
 
-# Estado de sincronização (gerado automaticamente, não commitar)
-.last_sync.json
-.last_hash.txt
-
-# Dados sensíveis
+# --- Credenciais sensíveis ---
 *_secret.txt
 *_private.txt
+*_key.txt
 credentials.json
 token.json
 service_account.json
 client_config.json
-temp_*.txt
+oauth*.json
 refresh_token.txt
 service_account_test.json
+access_token.json
 
-# Google Apps Script (se houver arquivos locais)
-.clasp.json
-*.gsheet
+# --- Rascunhos e tokens ---
+*.draft
+.draft
 
-# Obsidian
+# --- Estado de sincronização (gerado automaticamente) ---
+.last_sync.json
+.last_hash.txt
+.sync_state.json
+.cache.json
+
+# --- Arquivos temporários ---
+temp_*.txt
+temp_*.json
+*.tmp
+*.temp
+teste_*.html
+output_*.txt
+*.log
+
+# --- Obsidian ---
 .obsidian/
 .vault/
 
-# Python (para caminho pago MCP)
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.pyd
+.Python
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+setuptools-*.egg
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytype/
+mypy_cache/
+
+# --- Virtual environments ---
 .venv/
 venv/
 ENV/
 env/
+ENVNAME/
+env.bak/
+env.dir/
 
-# Node.js (se usar)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Sistema operacional
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# IDEs
-.vscode/
+# --- IDE e editor ---
 .idea/
 *.swp
 *.swo
 *~
+.vscode/
+*.code-workspace
+*.vscode
 
-# Logs (gerados automaticamente)
+# --- Testes ---
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# --- Build e dist ---
+dist/
+build/
+*.egg-info/
+.eggs/
+*.egg
+
+# --- Logs (gerados automaticamente) ---
 *.log
 logs/
 logs/*.jsonl
+logs/*.json
 
-# Arquivos temporários
+# --- Dados e outputs ---
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Docker ---
+.docker/
+docker-compose.override.yml
+.dockerignore
+Dockerfile*
+compose*.sh
+
+# --- Gerado pelo GitHub Actions ---
+/tmp/
 *.tmp
-*.temp
-teste_*.html
+
+# --- Jupyter notebooks ---
+.ipynb_checkpoints/
+
+# --- Makefile ---
+makefile
+Makefile
+
+# --- Security ---
+SECURITY.md
+CODE_OF_CONDUCT.md
+
+# --- Manuais e documentações temporárias ---
+*.md~
+*~
+.*.swp
+
+# --- Sistema operacional ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# --- NPM ---
+package-lock.json
+package-lock.json.*
+.npm
+.npmrc
+
+# --- Yarn ---
+.yarn
+.yarnrc.yml
+
+# --- pnpm ---
+.pnpm-store
+.pnpmfile.cjs
+
+# --- Obsidian plugins ---
+# (se instalados localmente)
+plugins/
+
+# --- Exceções para documentação ---
+# Mantém templates de exemplo
+!important/.env.example
+!important/config.example.txt
+
+# --- Arquivos de cache HTTP ---
+.cache/
+http_cache/
+
+# --- Sentry ---
+.sentry/
+
+# --- Vercel ---
+.vercel/
+
+# --- Netlify ---
+.netlify/
+
+# --- Google Apps Script ---
+.clasp.json
+ compilations/
+typescript-version/
+
+# --- Executáveis ---
+*.exe
+*.dll
+*.so
+*.dylib
+
+# --- Imagens temporárias ---
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+
+# --- Vídeos temporários ---
+*.mp4
+*.webm
+*.mov
+*.avi
+
+# --- Mensagens de erro ---
+*.di
+*.dylib.dSYM/
+
+# --- LLVM ---
+*.ll
+*.bc
+
+# --- OS X ---
+.AppleEventDone
+.AppleDouble
+.BinaryImage.__INFO
+.LinkBundle
+
+# -----------------------------------------------------------
+# REGEX PATTERNS PARA VARIÁVES AMBIENTE REais
+# -----------------------------------------------------------
+# Adicione ao seu .gitignore global ou use estas linhas:
+# ^.*api_key.*$
+# ^.*secret.*$
+# ^.*token.*$
+# ^.*password.*$
+# ^.*credential.*$
+# ^.*private.*$
+# ^.*key.*$

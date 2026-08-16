@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  obsidian-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: canalqb/obsidian:latest
+    container_name: obsidian-api
+    ports:
+      - "${PORT:-5000}:5000"
+    env_file:
+      - .env
+    environment:
+      # Override defaults - should be in .env
+      - API_SECRET_KEY=${API_SECRET_KEY}
+      - API_AUTH_ENABLED=${API_AUTH_ENABLED:-true}
+      - PORT=${PORT:-5000}
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - obsidian-network
+
+  # Watchdog service for monitoring
+  watchdog:
+    image: alpine:latest
+    container_name: obsidian-watchdog
+    depends_on:
+      obsidian-api:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      echo "Starting watchdog..." &&
+      while true; do
+        echo "[$(date)] Health check: $(curl -s -o /dev/null -w '%{http_code}' http://obsidian-api:5000/health || echo 'failed')"
+        sleep 30
+      done
+    restart: unless-stopped
+    networks:
+      - obsidian-network
+
+networks:
+  obsidian-network:
+    driver: bridge
+
+# Default ports mapping
+x-port-mapping: &port-mapping
+  PORT: 5000

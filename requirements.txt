@@ -1,20 +1,47 @@
-﻿# Google API Client Libraries
-google-api-python-client>=2.100.0
-google-auth-oauthlib>=1.0.0
-google-auth>=2.23.0
+﻿# ============================================================
+# OBSIDIAN Pipeline - Requirements
+# Pipeline completo: Obsidian + NotebookLM + Blogger + YouTube
+# ============================================================
 
-# HTTP e utilitarios
-requests>=2.31.0
+# --- Google API Client Libraries ---
+google-api-python-client>=2.133.0
+google-auth>=2.30.0
+google-auth-oauthlib>=1.2.0
+
+# --- HTTP e utilitários ---
+requests>=2.32.0
 python-dotenv>=1.0.0
 
-# API REST local (opcional — so necessario para obsidian_api.py)
-flask>=2.3.0
+# --- API REST ---
+flask>=3.0.0
+flask-limiter>=3.5.0
 
-# Upload YouTube (usa as mesmas libs Google)
-# Nenhuma dependencia extra — youtube_uploader.py usa google-api-python-client
+# --- Servidor de Produção ---
+gunicorn>=22.0.0
 
-# NotebookLM (API nao oficial — pode quebrar com atualizacoes do Google)
+# --- Upload YouTube ---
+# (usa as mesmas libs Google)
+
+# --- NotebookLM (API não oficial) ---
 notebooklm-py>=0.4.0
 
-# Google Sheets (usado pelo sheets_client.py)
-# ja incluso no google-api-python-client
+# --- Google Sheets (usado pelo sheets_client.py) ---
+# (já incluso no google-api-python-client)
+
+# --- Validação e tipagem ---
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+
+# --- Logging estruturado ---
+structlog>=24.1.0
+
+# --- JSON schema ---
+jsonschema>=4.23.0
+
+# --- Ferramentas de desenvolvimento ---
+# (instale com: pip install -r requirements-dev.txt)
+# pytest>=8.3.0
+# pytest-cov>=5.0.0
+# black>=24.10.0
+# isort>=5.13.2
+# mypy>=1.11.0
